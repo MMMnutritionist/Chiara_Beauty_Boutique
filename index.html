@@ -1223,6 +1223,10 @@ async function saveBookingToServer(booking) {
     }
 }
 
+/**
+ * Funzione principale che si attiva quando l'utente clicca sul pulsante "Prenota".
+ * Raccoglie i dati dal form e chiama la funzione per salvare la prenotazione.
+ */
 function bookSelectedService() {
     // Raccoglie i dati direttamente dagli elementi del form
     const customerName = document.getElementById('customerName').value;
@@ -1234,7 +1238,7 @@ function bookSelectedService() {
     const selectedServiceId = 'ID_DEL_TUO_SERVIZIO'; // Sostituisci con un valore dinamico
 
     // Verifica che tutti i campi obbligatori siano compilati
-    if (customerName && customerPhone && bookingDate && bookingTime) {
+    if (customerName && customerPhone && bookingDate && bookingTime && selectedServiceId) {
         const booking = {
             customerName,
             customerPhone,
