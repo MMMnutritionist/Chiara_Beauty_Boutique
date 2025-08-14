@@ -759,65 +759,100 @@
         // Numero WhatsApp del centro
         const WHATSAPP_NUMBER = '393513122638';
 
-        // CONFIGURAZIONE DATABASE GOOGLE SHEETS
-        const GOOGLE_SHEETS_CONFIG = {
-            // ⚠️ DOVRAI CONFIGURARE QUESTI VALORI:
-            SHEET_ID: 'TUO_GOOGLE_SHEET_ID_QUI', // Da sostituire
-            API_KEY: 'TUA_API_KEY_QUI', // Da sostituire
-            RANGE: 'Prenotazioni!A:F' // Nome del foglio e range
-        };
+        // CONFIGURAZIONE GOOGLE APPS SCRIPT
+const GOOGLE_APPS_SCRIPT_CONFIG = {
+    // URL dell'app web Google Apps Script (da ottenere dopo il deploy)
+    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbyJx1a6Qb_5T4AnhxL3Sh_2nJYqJQNS_VI0yc8ZmpRUHRerhMU73nlWAfQLcmsT0MyP/exec',
+    // Backup API key per lettura diretta (opzionale)
+    SHEET_ID: '1IKf9wnchif-CLq498pHd0twmcXmdBEWnNAyF5P5wnw8',
+    API_KEY: 'AIzaSyCkdjpzpmCdUiDmu9mIapOY5t1WSG4tX8o'
+};
 
         // Cache locale per ridurre chiamate API
         let bookingsCache = {};
         let lastCacheUpdate = null;
         const CACHE_DURATION = 30000; // 30 secondi
 
-        // Funzione per caricare prenotazioni da Google Sheets
-        async function loadBookingsFromSheets() {
-            try {
-                const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEETS_CONFIG.SHEET_ID}/values/${GOOGLE_SHEETS_CONFIG.RANGE}?key=${GOOGLE_SHEETS_CONFIG.API_KEY}`;
-                
-                const response = await fetch(url);
-                const data = await response.json();
-                
-                if (data.values) {
-                    const bookingsFromSheets = {};
-                    // Salta la prima riga (intestazioni)
-                    for (let i = 1; i < data.values.length; i++) {
-                        const row = data.values[i];
-                        const [serviceId, date, time, customerName, phone, count] = row;
-                        const key = `${serviceId}_${date}_${time}`;
-                        bookingsFromSheets[key] = parseInt(count) || 1;
-                    }
-                    
-                    bookingsCache = bookingsFromSheets;
-                    lastCacheUpdate = Date.now();
-                    
-                    console.log('📊 Prenotazioni caricate da Google Sheets:', Object.keys(bookingsFromSheets).length);
-                    return bookingsFromSheets;
-                }
-            } catch (error) {
-                console.error('❌ Errore caricamento da Google Sheets:', error);
-                // Fallback alla cache locale
-                return bookingsCache;
-            }
-            return {};
+        // Funzione per caricare prenotazioni tramite Google Apps Script
+async function loadBookingsFromScript() {
+    try {
+        const response = await fetch(GOOGLE_APPS_SCRIPT_CONFIG.WEB_APP_URL);
+        const data = await response.json();
+        
+        if (data.success) {
+            bookingsCache = data.bookings;
+            lastCacheUpdate = Date.now();
+            
+            console.log('📊 Prenotazioni caricate da Google Apps Script:', Object.keys(bookingsCache).length);
+            return bookingsCache;
+        } else {
+            throw new Error(data.error || 'Errore nel caricamento');
         }
+    } catch (error) {
+        console.error('❌ Errore caricamento da Google Apps Script:', error);
+        
+        // Fallback: prova caricamento diretto da Sheets API
+        return await loadBookingsFromSheetsDirect();
+    }
+}
 
-        // Funzione per salvare prenotazione su Google Sheets
-        async function saveBookingToSheets(booking) {
-            try {
-                // ⚠️ Questa richiede un backend o Google Apps Script per funzionare
-                // Per ora logghiamo solo in console
-                console.log('💾 Prenotazione da salvare su Google Sheets:', booking);
-                
-                // TODO: Implementare chiamata API per salvare
-                // Questo richiede un endpoint backend o Google Apps Script
-                
-            } catch (error) {
-                console.error('❌ Errore salvataggio su Google Sheets:', error);
+// Fallback: caricamento diretto da Google Sheets API (solo lettura)
+async function loadBookingsFromSheetsDirect() {
+    try {
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_APPS_SCRIPT_CONFIG.SHEET_ID}/values/Prenotazioni!A:F?key=${GOOGLE_APPS_SCRIPT_CONFIG.API_KEY}`;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.values) {
+            const bookingsFromSheets = {};
+            for (let i = 1; i < data.values.length; i++) {
+                const row = data.values[i];
+                const [serviceId, date, time, customerName, phone, count] = row;
+                const key = `${serviceId}_${date}_${time}`;
+                bookingsFromSheets[key] = (bookingsFromSheets[key] || 0) + (parseInt(count) || 1);
             }
+            
+            bookingsCache = bookingsFromSheets;
+            lastCacheUpdate = Date.now();
+            return bookingsFromSheets;
         }
+    } catch (error) {
+        console.error('❌ Errore caricamento diretto da Google Sheets:', error);
+        return bookingsCache; // Ritorna cache esistente
+    }
+    return {};
+}
+
+// Funzione per salvare prenotazione tramite Google Apps Script
+async function saveBookingToScript(booking) {
+    try {
+        const response = await fetch(GOOGLE_APPS_SCRIPT_CONFIG.WEB_APP_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(booking)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            console.log('✅ Prenotazione salvata con successo:', result.bookingId);
+            
+            // Aggiorna la cache locale
+            const key = getBookingKey(booking.serviceId, booking.date, booking.time);
+            bookingsCache[key] = (bookingsCache[key] || 0) + (booking.count || 1);
+            
+            return { success: true, bookingId: result.bookingId };
+        } else {
+            throw new Error(result.error || 'Errore nel salvataggio');
+        }
+    } catch (error) {
+        console.error('❌ Errore salvataggio prenotazione:', error);
+        return { success: false, error: error.message };
+    }
+}
 
         // Simulazione database prenotazioni con sincronizzazione
         let bookings = {};
