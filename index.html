@@ -908,10 +908,6 @@ async function saveBookingToScript(booking) {
             
             if (!dateInput.value || !timeInput.value) return null;
             
-            // Carica prenotazioni aggiornate se la cache è scaduta
-            if (!lastCacheUpdate || (Date.now() - lastCacheUpdate) > CACHE_DURATION) {
-                await loadBookingsFromSheets();
-            }
             
             const key = getBookingKey(selectedService.id, dateInput.value, timeInput.value);
             const currentBookings = bookingsCache[key] || 0;
@@ -1177,11 +1173,7 @@ Confermo la mia prenotazione per il trattamento selezionato. Grazie! ✨`;
             generateServiceCards();
             populateTimeSlots();
             document.getElementById('bookingDate').min = getMinDate();
-            
-            // 🔄 CARICA PRENOTAZIONI ESISTENTI DAL DATABASE
-            console.log('🔄 Caricamento prenotazioni esistenti...');
-            await loadBookingsFromSheets();
-            
+      
             // 📊 TRACCIA VISITA PAGINA PRENOTAZIONI
             trackEvent('Page View', {
                 page: 'booking',
