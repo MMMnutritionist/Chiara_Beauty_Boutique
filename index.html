@@ -692,16 +692,6 @@
     </script>
     <script defer src="/_vercel/insights/script.js"></script>
 
-    <script>
-        // Funzione helper per tracciare eventi personalizzati
-        function trackEvent(eventName, properties = {}) {
-            if (window.va) {
-                window.va('track', eventName, properties);
-            }
-            // Backup: log in console per debug
-            console.log('📊 Analytics Event:', eventName, properties);
-        }
-    </script>
 
     <script>
         // Configurazione servizi
@@ -1163,19 +1153,7 @@ setInterval(async () => {
         await loadBookingsFromScript();
     }
 }, CACHE_DURATION);
-            
-            // 📊 TRACCIA TENTATIVO DI PRENOTAZIONE (evento più importante!)
-            trackEvent('Booking Attempt', {
-                service_id: selectedService.id,
-                service_name: selectedService.title,
-                price: selectedService.price,
-                duration: selectedService.duration,
-                customer_name: nameInput.value,
-                booking_date: dateInput.value,
-                booking_time: timeInput.value,
-                availability_status: availability.status
-            });
-            
+           
             // Aggiorna le prenotazioni localmente
             const key = getBookingKey(selectedService.id, dateInput.value, timeInput.value);
             bookingsCache[key] = (bookingsCache[key] || 0) + 1;
@@ -1221,17 +1199,6 @@ Confermo la mia prenotazione per il trattamento selezionato. Grazie! ✨`;
             const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
             window.open(whatsappUrl, '_blank');
             
-            // 📊 TRACCIA COMPLETAMENTO PRENOTAZIONE (quando apre WhatsApp)
-            trackEvent('Booking Completed', {
-                service_id: selectedService.id,
-                service_name: selectedService.title,
-                price: selectedService.price,
-                duration: selectedService.duration,
-                booking_date: formattedDate,
-                booking_time: timeInput.value,
-                revenue: selectedService.price // Utile per calcolare fatturato
-            });
-            
             // Mostra il popup per la consulenza nutrizionale dopo un breve ritardo
             setTimeout(() => {
                 showNutritionistPopup();
@@ -1269,12 +1236,6 @@ Confermo la mia prenotazione per il trattamento selezionato. Grazie! ✨`;
             event.preventDefault();
             const name = document.getElementById('customerName').value || 'Cliente';
 
-            // 📊 TRACCIA INTERESSE CONSULENZA NUTRIZIONALE
-            trackEvent('Nutritionist Interest', {
-                customer_name: name,
-                source: 'post_booking_popup'
-            });
-
             const message = `Ciao! Sono ${name}, ho appena prenotato un trattamento estetico presso Chiara Beauty Boutique e vorrei approfittare dell'offerta speciale sulla consulenza nutrizionale. Puoi fornirmi maggiori dettagli? Grazie!`;
 
             const whatsappUrl = `https://wa.me/393665068384?text=${encodeURIComponent(message)}`;
@@ -1283,13 +1244,6 @@ Confermo la mia prenotazione per il trattamento selezionato. Grazie! ✨`;
             closeNutritionistPopup();
         }
 
-        function declineNutritionistOffer() {
-            // 📊 TRACCIA RIFIUTO CONSULENZA NUTRIZIONALE
-            trackEvent('Nutritionist Declined', {
-                source: 'post_booking_popup'
-            });
-            closeNutritionistPopup();
-        }
 
         // Orari di apertura aggiornati
         function generateTimeSlots() {
@@ -1349,41 +1303,8 @@ Confermo la mia prenotazione per il trattamento selezionato. Grazie! ✨`;
             // 🔄 CARICA PRENOTAZIONI ESISTENTI DAL DATABASE
             console.log('🔄 Caricamento prenotazioni esistenti...');
             await loadBookingsFromSheets();
+        
             
-            // 📊 TRACCIA VISITA PAGINA PRENOTAZIONI
-            trackEvent('Page View', {
-                page: 'booking',
-                timestamp: new Date().toISOString(),
-                existing_bookings: Object.keys(bookingsCache).length
-            });
-            
-            // 📊 TRACCIA CLICK SU LINK ESTERNI
-            document.addEventListener('click', function(e) {
-                const instagramLink = e.target.closest('a[href*="instagram.com"]');
-                if (instagramLink) {
-                    trackEvent('External Link Click', {
-                        link_type: 'instagram',
-                        url: instagramLink.href
-                    });
-                }
-                
-                const mapLink = e.target.closest('a[href*="maps.app.goo.gl"]');
-                if (mapLink) {
-                    trackEvent('External Link Click', {
-                        link_type: 'google_maps',
-                        url: mapLink.href
-                    });
-                }
-                
-                const nutritionistLink = e.target.closest('a[href*="wa.me/393665068384"]');
-                if (nutritionistLink) {
-                    trackEvent('Nutritionist Contact', {
-                        source: 'main_section',
-                        contact_method: 'whatsapp'
-                    });
-                }
-            });
-        });
 
     </script>
 
