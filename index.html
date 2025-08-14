@@ -1320,16 +1320,6 @@ Confermo la mia prenotazione per il trattamento selezionato. Grazie! ✨`;
                 timeSelect.appendChild(option);
             });
         }
-
-        // Inizializzazione della pagina con caricamento database
-        document.addEventListener('DOMContentLoaded', async function() {
-            generateServiceCards();
-            populateTimeSlots();
-            document.getElementById('bookingDate').min = getMinDate();
-            
-            // 🔄 CARICA PRENOTAZIONI ESISTENTI DAL DATABASE
-            console.log('🔄 Caricamento prenotazioni esistenti...');
-            await loadBookingsFromSheets();
             
             // 📊 TRACCIA VISITA PAGINA PRENOTAZIONI
             trackEvent('Page View', {
