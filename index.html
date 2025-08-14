@@ -759,14 +759,6 @@
         // Numero WhatsApp del centro
         const WHATSAPP_NUMBER = '393513122638';
 
-
-        // Funzione per selezionare un servizio
-        function selectService(serviceId) {
-            // Rimuovi selezione precedente
-            document.querySelectorAll('.service-card').forEach(card => {
-                card.classList.remove('selected');
-            });
-            
             // Seleziona nuovo servizio
             const selectedCard = document.querySelector(`[data-service-id="${serviceId}"]`);
             selectedCard.classList.add('selected');
