@@ -755,10 +755,198 @@
 
         // Numero WhatsApp del centro
         const WHATSAPP_NUMBER = '393513122638';
+        
+// ⚠️ SOSTITUISCI QUESTO URL CON IL TUO NUOVO URL DI DEPLOYMENT
+const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxVMzt3MpxxwcgyBrNmiYBAL5OPrUTRYXXc_2xLJPwVVQpKE6wXBSh8rg_qRQ5nL8Pd6g/exec';
 
-        // CONFIGURAZIONE GOOGLE APPS SCRIPT
-        const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzzowiSi2BWSQMExySRmu8rVmzkQpbAFDZs4MLgzM5M-U8Xl2duJhIQbox9C-jC5x-15A/exec';
+// ⚠️ FUNZIONE CORRETTA PER VERIFICARE DISPONIBILITÀ
+async function checkAvailabilityOnline(serviceId, date, time) {
+    try {
+        console.log('🔍 Verifica disponibilità online...', { serviceId, date, time });
+        
+        const url = new URL(GOOGLE_APPS_SCRIPT_URL);
+        url.searchParams.append('action', 'checkAvailability');
+        url.searchParams.append('serviceId', serviceId);
+        url.searchParams.append('date', date);
+        url.searchParams.append('time', time);
+        
+        console.log('📡 URL chiamata:', url.toString());
+        
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+            }
+        });
+        
+        console.log('📡 Response status:', response.status);
+        console.log('📡 Response headers:', [...response.headers.entries()]);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('✅ Risposta ricevuta:', data);
+        
+        if (data.success) {
+            return data.available;
+        } else {
+            throw new Error(data.error || 'Errore sconosciuto dal server');
+        }
+        
+    } catch (error) {
+        console.error('❌ Errore verifica disponibilità online:', error);
+        
+        // Fallback alla verifica locale
+        console.log('🔄 Fallback alla verifica locale...');
+        return checkAvailabilityLocal(serviceId, date, time);
+    }
+}
 
+        // ⚠️ FUNZIONE CORRETTA PER INVIARE PRENOTAZIONE
+async function sendBookingToGoogleSheets(bookingData) {
+    try {
+        console.log('📤 Invio prenotazione a Google Sheets...', bookingData);
+        
+        const url = new URL(GOOGLE_APPS_SCRIPT_URL);
+        url.searchParams.append('action', 'addBooking');
+        url.searchParams.append('nome', bookingData.nome);
+        url.searchParams.append('telefono', bookingData.telefono);
+        url.searchParams.append('servizio', bookingData.servizio);
+        url.searchParams.append('data', bookingData.data);
+        url.searchParams.append('orario', bookingData.orario);
+        url.searchParams.append('note', bookingData.note || '');
+        
+        console.log('📡 URL prenotazione:', url.toString());
+        
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('✅ Risposta prenotazione:', data);
+        
+        if (data.success) {
+            return { success: true, message: data.message };
+        } else {
+            throw new Error(data.error || 'Errore nell\'invio della prenotazione');
+        }
+        
+    } catch (error) {
+        console.error('❌ Errore invio prenotazione:', error);
+        
+        // Fallback al salvataggio locale
+        console.log('🔄 Fallback al salvataggio locale...');
+        saveBookingLocally(bookingData);
+        
+        return { 
+            success: true, 
+            message: 'Prenotazione salvata localmente. Ti contatteremo presto!' 
+        };
+    }
+}
+
+// ⚠️ FUNZIONE CORRETTA PER VERIFICARE DISPONIBILITÀ GENERALE
+async function checkAvailability(serviceId, date, time) {
+    try {
+        // Prima prova online
+        const isAvailable = await checkAvailabilityOnline(serviceId, date, time);
+        
+        // Trova l'elemento per mostrare lo stato
+        const statusElement = document.querySelector('.availability-status');
+        if (statusElement) {  // ⚠️ CONTROLLO NULL AGGIUNTO
+            if (isAvailable) {
+                statusElement.textContent = '✅ Disponibile';
+                statusElement.className = 'availability-status available';
+            } else {
+                statusElement.textContent = '❌ Non disponibile';
+                statusElement.className = 'availability-status unavailable';
+            }
+        }
+        
+        return isAvailable;
+        
+    } catch (error) {
+        console.error('❌ Errore generale verifica disponibilità:', error);
+        
+        // In caso di errore, assume disponibile per non bloccare
+        const statusElement = document.querySelector('.availability-status');
+        if (statusElement) {  // ⚠️ CONTROLLO NULL AGGIUNTO
+            statusElement.textContent = '⚠️ Verifica non riuscita';
+            statusElement.className = 'availability-status warning';
+        }
+        
+        return true; // Assume disponibile in caso di errore
+    }
+}
+
+// ⚠️ VERIFICA LOCALE (FALLBACK)
+function checkAvailabilityLocal(serviceId, date, time) {
+    const bookings = JSON.parse(localStorage.getItem('bookings') || '[]');
+    return !bookings.some(booking => 
+        booking.data === date && 
+        booking.orario === time
+    );
+}
+        // In caso di errore, assume disponibile per non bloccare
+        const statusElement = document.querySelector('.availability-status');
+        if (statusElement) {  // ⚠️ CONTROLLO NULL AGGIUNTO
+            statusElement.textContent = '⚠️ Verifica non riuscita';
+            statusElement.className = 'availability-status warning';
+        }
+        
+        return true; // Assume disponibile in caso di errore
+    }
+}
+
+// ⚠️ SALVATAGGIO LOCALE (FALLBACK)
+function saveBookingLocally(bookingData) {
+    const bookings = JSON.parse(localStorage.getItem('bookings') || '[]');
+    bookings.push({
+        ...bookingData,
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        status: 'pending'
+    });
+    localStorage.setItem('bookings', JSON.stringify(bookings));
+    console.log('💾 Prenotazione salvata localmente:', bookingData);
+}
+
+// ⚠️ FUNZIONE DI TEST PER VERIFICARE LA CONNESSIONE
+async function testConnection() {
+    try {
+        console.log('🧪 Test connessione Google Apps Script...');
+        
+        const url = new URL(GOOGLE_APPS_SCRIPT_URL);
+        url.searchParams.append('action', 'test');
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        console.log('✅ Test connessione riuscito:', data);
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Test connessione fallito:', error);
+        return false;
+    }
+}
+        
+// ⚠️ AGGIUNGI QUESTO AL TUO HTML PER TESTARE
+/*
+<button onclick="testConnection()" style="position: fixed; top: 10px; right: 10px; z-index: 9999; background: red; color: white; padding: 10px;">
+    TEST CONNECTION
+</button>
+*/
+       
         // Cache e stato
         let bookings = {};
         let selectedService = null;
@@ -790,100 +978,6 @@
                 return false;
             }
         }
-
-// ⚠️ VERSIONE CORRETTA - Sostituisci TUTTA la funzione saveBookingToGoogle
-
-async function saveBookingToGoogle(bookingData) {
-    try {
-        console.log('💾 Salvataggio prenotazione su Google Sheets...', bookingData);
-        
-        // ⚠️ PRIMA OPZIONE: Prova con sendBookingToGoogleSheets (se hai implementato la soluzione CORS)
-        if (typeof sendBookingToGoogleSheets === 'function') {
-            const result = await sendBookingToGoogleSheets(bookingData);
-            if (result.success) {
-                console.log('✅ Prenotazione salvata con successo:', result.message);
-                return { success: true, bookingId: 'CBB-' + Date.now(), message: result.message };
-            }
-        }
-        
-        // ⚠️ SECONDA OPZIONE: Usa no-cors come fallback
-        const url = new URL(GOOGLE_APPS_SCRIPT_URL || 'YOUR_SCRIPT_URL_HERE');
-        url.searchParams.append('action', 'addBooking');
-        url.searchParams.append('nome', bookingData.nome || bookingData.name);
-        url.searchParams.append('telefono', bookingData.telefono || bookingData.phone);
-        url.searchParams.append('servizio', bookingData.servizio || bookingData.service);
-        url.searchParams.append('data', bookingData.data || bookingData.date);
-        url.searchParams.append('orario', bookingData.orario || bookingData.time);
-        url.searchParams.append('note', bookingData.note || bookingData.notes || '');
-        
-        const response = await fetch(url, {
-            method: 'GET', // ⚠️ Usa GET invece di POST per evitare preflight CORS
-            mode: 'no-cors'
-        });
-        
-        console.log('📡 Richiesta inviata (modalità no-cors)');
-        
-        // Salva anche localmente come backup
-        saveBookingLocally(bookingData);
-        
-        // Genera ID locale
-        const bookingId = 'CBB-' + Date.now();
-        
-        // Aggiorna stato locale delle prenotazioni
-        if (typeof bookings !== 'undefined') {
-            const key = getBookingKey(
-                bookingData.serviceId || bookingData.servizio, 
-                bookingData.date || bookingData.data, 
-                bookingData.time || bookingData.orario
-            );
-            bookings[key] = (bookings[key] || 0) + 1;
-        }
-        
-        return { 
-            success: true, 
-            bookingId: bookingId,
-            message: 'Prenotazione inviata con successo! Ti contatteremo presto per confermare.'
-        };
-        
-    } catch (error) {
-        console.error('❌ Errore salvataggio prenotazione:', error);
-        
-        // Salva localmente in caso di errore
-        try {
-            saveBookingLocally(bookingData);
-            return { 
-                success: true, 
-                bookingId: 'LOCAL-' + Date.now(),
-                message: 'Prenotazione salvata localmente. Ti contatteremo presto!'
-            };
-        } catch (localError) {
-            console.error('❌ Errore anche nel salvataggio locale:', localError);
-            return { 
-                success: false, 
-                error: 'Errore nel salvare la prenotazione: ' + error.message 
-            };
-        }
-    }
-}
-
-// ⚠️ FUNZIONE DI SUPPORTO per salvataggio locale (se non esiste già)
-function saveBookingLocally(bookingData) {
-    try {
-        const bookings = JSON.parse(localStorage.getItem('localBookings') || '[]');
-        const booking = {
-            ...bookingData,
-            id: Date.now(),
-            timestamp: new Date().toISOString(),
-            status: 'pending',
-            source: 'local'
-        };
-        bookings.push(booking);
-        localStorage.setItem('localBookings', JSON.stringify(bookings));
-        console.log('💾 Prenotazione salvata localmente:', booking);
-    } catch (error) {
-        console.error('❌ Errore salvataggio locale:', error);
-    }
-}
 
 // ⚠️ FUNZIONE DI SUPPORTO per generare chiave prenotazione (se non esiste già)
 function getBookingKey(serviceId, date, time) {
