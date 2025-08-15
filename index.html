@@ -827,9 +827,7 @@ async function saveBookingToGoogle(bookingData) {
                 bookings[key] = (bookings[key] || 0) + 1;
                 
                 return { success: true, bookingId: bookingId };
-            }
-        }
-
+            
         // Verifica disponibilità in tempo reale da Google Sheets
         async function checkAvailabilityOnline(serviceId, date, time) {
             try {
