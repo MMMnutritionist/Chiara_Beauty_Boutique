@@ -755,564 +755,478 @@
 
         // Numero WhatsApp del centro
         const WHATSAPP_NUMBER = '393513122638';
-        
-// ⚠️ URL del Google Apps Script
-const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxVMzt3MpxxwcgyBrNmiYBAL5OPrUTRYXXc_2xLJPwVVQpKE6wXBSh8rg_qRQ5nL8Pd6g/exec';
 
-// Cache e stato
-let bookings = {};
-let selectedService = null;
-let lastCacheUpdate = null;
-const CACHE_DURATION = 30000; // 30 secondi
+        // CONFIGURAZIONE GOOGLE APPS SCRIPT
+        const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzdYCjKXmPT4XwD3tIXZ7PaAsRsKxKVcJRU3GquO1auIXAx6LZZOCON0nDdAHUDt8_cYA/exec';
 
-// 🛡️ GESTIONE ERRORI EXTENSION CHROME
-function setupErrorHandling() {
-    // Gestisci errori delle estensioni Chrome
-    window.addEventListener('error', function(e) {
-        // Sopprimi errori comuni delle estensioni
-        if (e.message.includes('Extension context invalidated') || 
-            e.message.includes('message port closed') ||
-            e.message.includes('runtime.lastError')) {
-            console.log('🔇 Errore estensione Chrome soppresso:', e.message);
-            e.preventDefault();
-            return false;
-        }
-    });
+        // Cache e stato
+        let bookings = {};
+        let selectedService = null;
+        let lastCacheUpdate = null;
+        const CACHE_DURATION = 30000; // 30 secondi
 
-    // Gestisci promise rejections non catturate
-    window.addEventListener('unhandledrejection', function(e) {
-        if (e.reason && typeof e.reason === 'string' && 
-            (e.reason.includes('Extension') || e.reason.includes('runtime'))) {
-            console.log('🔇 Promise rejection estensione Chrome soppressa:', e.reason);
-            e.preventDefault();
-        }
-    });
-}
-
-// 🔧 FUNZIONE MIGLIORATA PER VERIFICARE DISPONIBILITÀ ONLINE
-async function checkAvailabilityOnline(serviceId, date, time) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
-    try {
-        console.log('🔍 Verifica disponibilità online...', { serviceId, date, time });
-        
-        const url = new URL(GOOGLE_APPS_SCRIPT_URL);
-        url.searchParams.append('action', 'checkAvailability');
-        url.searchParams.append('serviceId', serviceId);
-        url.searchParams.append('date', date);
-        url.searchParams.append('time', time);
-        
-        console.log('📡 URL chiamata:', url.toString());
-        
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'Cache-Control': 'no-cache'
-            },
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        console.log('📡 Response status:', response.status);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        console.log('✅ Risposta ricevuta:', data);
-        
-        if (data.success !== undefined) {
-            return data.available || data.success;
-        } else {
-            throw new Error(data.error || 'Formato risposta non valido');
-        }
-        
-    } catch (error) {
-        clearTimeout(timeoutId);
-        
-        if (error.name === 'AbortError') {
-            console.error('⏱️ Timeout verifica disponibilità online');
-        } else {
-            console.error('❌ Errore verifica disponibilità online:', error);
-        }
-        
-        // Fallback alla verifica locale
-        console.log('🔄 Fallback alla verifica locale...');
-        return checkAvailabilityLocal(serviceId, date, time);
-    }
-}
-
-// 🔧 FUNZIONE MIGLIORATA PER INVIARE PRENOTAZIONE
-async function sendBookingToGoogleSheets(bookingData) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
-
-    try {
-        console.log('📤 Invio prenotazione a Google Sheets...', bookingData);
-        
-        // Validazione dati
-        const requiredFields = ['nome', 'telefono', 'servizio', 'data', 'orario'];
-        for (const field of requiredFields) {
-            if (!bookingData[field]) {
-                throw new Error(`Campo obbligatorio mancante: ${field}`);
+        // Carica prenotazioni da Google Sheets
+        async function loadBookingsFromGoogle() {
+            try {
+                console.log('🔄 Caricamento prenotazioni da Google Sheets...');
+                
+                const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?action=getBookings`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    bookings = result.data.bookings || {};
+                    lastCacheUpdate = Date.now();
+                    console.log('✅ Prenotazioni caricate da Google Sheets:', Object.keys(bookings).length);
+                    return true;
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                console.error('❌ Errore caricamento da Google Sheets:', error);
+                
+                // Fallback: carica da variabile
+                console.log('📦 Fallback: utilizzo dati locali');
+                bookings = {};
+                return false;
             }
         }
-        
-        const url = new URL(GOOGLE_APPS_SCRIPT_URL);
-        url.searchParams.append('action', 'addBooking');
-        url.searchParams.append('nome', bookingData.nome.trim());
-        url.searchParams.append('telefono', bookingData.telefono.trim());
-        url.searchParams.append('servizio', bookingData.servizio);
-        url.searchParams.append('data', bookingData.data);
-        url.searchParams.append('orario', bookingData.orario);
-        url.searchParams.append('note', bookingData.note || '');
-        url.searchParams.append('timestamp', new Date().toISOString());
-        
-        console.log('📡 URL prenotazione:', url.toString());
-        
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'Cache-Control': 'no-cache'
-            },
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        console.log('✅ Risposta prenotazione:', data);
-        
-        if (data.success) {
-            return { success: true, message: data.message || 'Prenotazione inviata con successo!' };
-        } else {
-            throw new Error(data.error || 'Errore nell\'invio della prenotazione');
-        }
-        
-    } catch (error) {
-        clearTimeout(timeoutId);
-        
-        if (error.name === 'AbortError') {
-            console.error('⏱️ Timeout invio prenotazione');
-        } else {
-            console.error('❌ Errore invio prenotazione:', error);
-        }
-        
-        // Fallback al salvataggio locale
-        console.log('🔄 Fallback al salvataggio locale...');
-        saveBookingLocally(bookingData);
-        
-        return { 
-            success: true, 
-            message: 'Prenotazione salvata localmente. Ti contatteremo presto!',
-            fallback: true
-        };
-    }
-}
 
-// 🔧 FUNZIONE MIGLIORATA PER VERIFICARE DISPONIBILITÀ GENERALE
-async function checkAvailability(serviceId, date, time) {
-    try {
-        // Prima prova online
-        const isAvailable = await checkAvailabilityOnline(serviceId, date, time);
-        
-        // Trova l'elemento per mostrare lo stato (con controllo sicurezza)
-        const statusElement = document.querySelector('.availability-status');
-        if (statusElement) {
-            if (isAvailable) {
-                statusElement.textContent = '✅ Disponibile';
-                statusElement.className = 'availability-status available';
-            } else {
-                statusElement.textContent = '❌ Non disponibile';
-                statusElement.className = 'availability-status unavailable';
-            }
-        }
-        
-        return isAvailable;
-        
-    } catch (error) {
-        console.error('❌ Errore generale verifica disponibilità:', error);
-        
-        // In caso di errore, assume disponibile per non bloccare
-        const statusElement = document.querySelector('.availability-status');
-        if (statusElement) {
-            statusElement.textContent = '⚠️ Verifica non riuscita - procedere con cautela';
-            statusElement.className = 'availability-status warning';
-        }
-        
-        return true; // Assume disponibile in caso di errore
-    }
-}
-
-// VERIFICA LOCALE (FALLBACK) - MIGLIORATA
-function checkAvailabilityLocal(serviceId, date, time) {
-    try {
-        const bookings = JSON.parse(localStorage.getItem('bookings') || '[]');
-        const isBooked = bookings.some(booking => 
-            booking.data === date && 
-            booking.orario === time &&
-            booking.serviceId === serviceId
-        );
-        
-        console.log('💾 Verifica locale:', { serviceId, date, time, isBooked, totalBookings: bookings.length });
-        return !isBooked;
-    } catch (error) {
-        console.error('❌ Errore verifica locale:', error);
-        return true; // In caso di errore, assume disponibile
-    }
-}
-
-// SALVATAGGIO LOCALE (FALLBACK) - MIGLIORATO
-function saveBookingLocally(bookingData) {
-    try {
-        const bookings = JSON.parse(localStorage.getItem('bookings') || '[]');
-        const newBooking = {
-            ...bookingData,
-            id: Date.now(),
-            timestamp: new Date().toISOString(),
-            status: 'pending',
-            source: 'fallback'
-        };
-        
-        bookings.push(newBooking);
-        localStorage.setItem('bookings', JSON.stringify(bookings));
-        
-        console.log('💾 Prenotazione salvata localmente:', newBooking);
-        
-        // Notifica all'utente che la prenotazione è salvata localmente
-        showNotification('Prenotazione salvata localmente. Ti contatteremo per confermare.', 'info');
-        
-    } catch (error) {
-        console.error('❌ Errore salvataggio locale:', error);
-        showNotification('Errore nel salvataggio. Riprova o contattaci direttamente.', 'error');
-    }
-}
-
-// 🔧 FUNZIONE MIGLIORATA DI TEST CONNESSIONE
-async function testConnection() {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
-    
-    try {
-        console.log('🧪 Test connessione Google Apps Script...');
-        
-        const url = new URL(GOOGLE_APPS_SCRIPT_URL);
-        url.searchParams.append('action', 'test');
-        url.searchParams.append('timestamp', Date.now());
-        
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'Cache-Control': 'no-cache'
-            },
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log('✅ Test connessione riuscito:', data);
-        
-        showNotification('Connessione al server attiva', 'success');
-        return true;
-        
-    } catch (error) {
-        clearTimeout(timeoutId);
-        
-        if (error.name === 'AbortError') {
-            console.error('⏱️ Timeout test connessione');
-        } else {
-            console.error('❌ Test connessione fallito:', error);
-        }
-        
-        showNotification('Connessione al server non disponibile - modalità offline attiva', 'warning');
-        return false;
-    }
-}
-
-// 🆕 FUNZIONE PER MOSTRARE NOTIFICHE
-function showNotification(message, type = 'info') {
-    // Rimuovi notifiche esistenti
-    const existingNotifications = document.querySelectorAll('.notification');
-    existingNotifications.forEach(n => n.remove());
-    
-    // Crea nuova notifica
-    const notification = document.createElement('div');
-    notification.className = `notification notification-${type}`;
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        padding: 15px 20px;
-        border-radius: 8px;
-        z-index: 10000;
-        font-weight: 500;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        transform: translateX(100%);
-        transition: transform 0.3s ease;
-    `;
-    
-    // Colori in base al tipo
-    const colors = {
-        success: { bg: '#d4edda', color: '#155724', border: '#c3e6cb' },
-        error: { bg: '#f8d7da', color: '#721c24', border: '#f5c6cb' },
-        warning: { bg: '#fff3cd', color: '#856404', border: '#ffeaa7' },
-        info: { bg: '#d1ecf1', color: '#0c5460', border: '#bee5eb' }
-    };
-    
-    const style = colors[type] || colors.info;
-    notification.style.backgroundColor = style.bg;
-    notification.style.color = style.color;
-    notification.style.border = `1px solid ${style.border}`;
-    
-    notification.textContent = message;
-    document.body.appendChild(notification);
-    
-    // Animazione di entrata
-    setTimeout(() => {
-        notification.style.transform = 'translateX(0)';
-    }, 100);
-    
-    // Rimozione automatica
-    setTimeout(() => {
-        notification.style.transform = 'translateX(100%)';
-        setTimeout(() => notification.remove(), 300);
-    }, 5000);
-}
-
-// Carica prenotazioni da Google Sheets - MIGLIORATA
-async function loadBookingsFromGoogle() {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
-    
-    try {
-        console.log('🔄 Caricamento prenotazioni da Google Sheets...');
-        
-        const url = new URL(GOOGLE_APPS_SCRIPT_URL);
-        url.searchParams.append('action', 'getBookings');
-        url.searchParams.append('timestamp', Date.now());
-        
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'Cache-Control': 'no-cache'
-            },
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            bookings = result.data?.bookings || {};
-            lastCacheUpdate = Date.now();
-            console.log('✅ Prenotazioni caricate da Google Sheets:', Object.keys(bookings).length);
-            return true;
-        } else {
-            throw new Error(result.message || 'Risposta non valida dal server');
-        }
-        
-    } catch (error) {
-        clearTimeout(timeoutId);
-        
-        if (error.name === 'AbortError') {
-            console.error('⏱️ Timeout caricamento prenotazioni');
-        } else {
-            console.error('❌ Errore caricamento da Google Sheets:', error);
-        }
-        
-        // Fallback: carica dati locali
-        console.log('📦 Fallback: utilizzo dati locali');
-        try {
-            const localBookings = JSON.parse(localStorage.getItem('bookings') || '[]');
-            bookings = {};
-            // Converte array locale in formato hash
-            localBookings.forEach(booking => {
-                const key = `${booking.serviceId}-${booking.data}-${booking.orario}`;
+        // Salva prenotazione su Google Sheets
+        async function saveBookingToGoogle(bookingData) {
+            try {
+                console.log('💾 Salvataggio prenotazione su Google Sheets...');
+                
+                const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(bookingData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    console.log('✅ Prenotazione salvata:', result.data.bookingId);
+                    
+                    // Aggiorna cache locale
+                    const key = getBookingKey(bookingData.serviceId, bookingData.date, bookingData.time);
+                    bookings[key] = (bookings[key] || 0) + 1;
+                    
+                    return { success: true, bookingId: result.data.bookingId };
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                console.error('❌ Errore salvataggio su Google Sheets:', error);
+                
+                // Genera ID fittizio per continuare il flusso
+                const bookingId = 'TEMP-' + Date.now();
+                const key = getBookingKey(bookingData.serviceId, bookingData.date, bookingData.time);
                 bookings[key] = (bookings[key] || 0) + 1;
+                
+                return { success: true, bookingId: bookingId };
+            }
+        }
+
+        // Verifica disponibilità in tempo reale da Google Sheets
+        async function checkAvailabilityOnline(serviceId, date, time) {
+            try {
+                const url = `${GOOGLE_APPS_SCRIPT_URL}?action=checkAvailability&serviceId=${serviceId}&date=${date}&time=${time}`;
+                const response = await fetch(url);
+                const result = await response.json();
+                
+                if (result.success) {
+                    return result.data;
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                console.error('❌ Errore verifica disponibilità online:', error);
+                return null;
+            }
+        }
+
+        // Funzione per selezionare un servizio
+        function selectService(serviceId) {
+            // Rimuovi selezione precedente
+            document.querySelectorAll('.service-card').forEach(card => {
+                card.classList.remove('selected');
             });
-            console.log('📦 Dati locali caricati:', Object.keys(bookings).length);
-        } catch (localError) {
-            console.error('❌ Errore caricamento dati locali:', localError);
-            bookings = {};
-        }
-        
-        return false;
-    }
-}
-
-// FUNZIONE DI SUPPORTO per generare chiave prenotazione
-function getBookingKey(serviceId, date, time) {
-    return `${serviceId}-${date}-${time}`;
-}
-
-// Funzione per selezionare un servizio - MIGLIORATA
-function selectService(serviceId) {
-    try {
-        // Rimuovi selezione precedente
-        document.querySelectorAll('.service-card').forEach(card => {
-            card.classList.remove('selected');
-        });
-        
-        // Seleziona nuovo servizio
-        const selectedCard = document.querySelector(`[data-service-id="${serviceId}"]`);
-        if (!selectedCard) {
-            console.error('❌ Servizio non trovato:', serviceId);
-            return;
-        }
-        
-        selectedCard.classList.add('selected');
-        
-        // Trova il servizio nei dati
-        selectedService = window.services?.find(s => s.id === serviceId);
-        if (!selectedService) {
-            console.error('❌ Dati servizio non trovati:', serviceId);
-            return;
-        }
-        
-        // 📊 TRACCIA SELEZIONE SERVIZIO (se trackEvent è disponibile)
-        if (typeof trackEvent === 'function') {
+            
+            // Seleziona nuovo servizio
+            const selectedCard = document.querySelector(`[data-service-id="${serviceId}"]`);
+            selectedCard.classList.add('selected');
+            
+            selectedService = services.find(s => s.id === serviceId);
+            
+            // 📊 TRACCIA SELEZIONE SERVIZIO
             trackEvent('Service Selected', {
                 service_id: selectedService.id,
                 service_name: selectedService.title,
                 price: selectedService.price,
                 duration: selectedService.duration
             });
-        }
-        
-        // Aggiorna UI con controlli di sicurezza
-        const serviceNameEl = document.getElementById('selectedServiceName');
-        const serviceDetailsEl = document.getElementById('selectedServiceDetails');
-        const serviceInfoEl = document.getElementById('selectedServiceInfo');
-        const noServiceEl = document.getElementById('noServiceSelected');
-        const formEl = document.getElementById('mainBookingForm');
-        const btnEl = document.getElementById('mainBookBtn');
-        
-        if (serviceNameEl) serviceNameEl.textContent = selectedService.title;
-        if (serviceDetailsEl) serviceDetailsEl.textContent = `€${selectedService.price} • ${selectedService.duration} minuti`;
-        if (serviceInfoEl) serviceInfoEl.classList.add('show');
-        if (noServiceEl) noServiceEl.style.display = 'none';
-        if (formEl) formEl.style.display = 'grid';
-        if (btnEl) btnEl.style.display = 'flex';
-        
-        // Reset form e disponibilità
-        if (formEl) formEl.reset();
-        const availabilityEl = document.getElementById('availabilityIndicator');
-        if (availabilityEl) {
-            availabilityEl.textContent = '';
-            availabilityEl.className = 'availability-indicator';
-        }
-        
-        console.log('✅ Servizio selezionato:', selectedService.title);
-        
-    } catch (error) {
-        console.error('❌ Errore selezione servizio:', error);
-        showNotification('Errore nella selezione del servizio', 'error');
-    }
-}
-
-// Rest of your existing functions would continue here...
-// (I've shown the key improvements for the main functions that handle network requests and error handling)
-
-// Inizializzazione della pagina - MIGLIORATA
-document.addEventListener('DOMContentLoaded', async function() {
-    try {
-        // Configura gestione errori per le estensioni Chrome
-        setupErrorHandling();
-        
-        console.log('🚀 Inizializzazione sistema prenotazioni...');
-        
-        // Test di connessione iniziale
-        const isConnected = await testConnection();
-        
-        // Carica prenotazioni (con fallback)
-        await loadBookingsFromGoogle();
-        
-        // Inizializza UI
-        if (typeof generateServiceCards === 'function') generateServiceCards();
-        if (typeof populateTimeSlots === 'function') populateTimeSlots();
-        
-        const dateInput = document.getElementById('bookingDate');
-        if (dateInput && typeof getMinDate === 'function') {
-            dateInput.min = getMinDate();
+            
+            // Aggiorna UI
+            document.getElementById('selectedServiceName').textContent = selectedService.title;
+            document.getElementById('selectedServiceDetails').textContent = `€${selectedService.price} • ${selectedService.duration} minuti`;
+            
+            document.getElementById('selectedServiceInfo').classList.add('show');
+            document.getElementById('noServiceSelected').style.display = 'none';
+            document.getElementById('mainBookingForm').style.display = 'grid';
+            document.getElementById('mainBookBtn').style.display = 'flex';
+            
+            // Reset form e disponibilità
+            document.getElementById('mainBookingForm').reset();
+            document.getElementById('availabilityIndicator').textContent = '';
+            document.getElementById('availabilityIndicator').className = 'availability-indicator';
         }
 
-        // 📊 TRACCIA VISITA PAGINA (se trackEvent è disponibile)
-        if (typeof trackEvent === 'function') {
+        // Funzione per ottenere la chiave del booking
+        function getBookingKey(serviceId, date, time) {
+            return `${serviceId}_${date}_${time}`;
+        }
+
+        // Funzione per verificare la disponibilità
+        async function checkAvailability() {
+            if (!selectedService) return null;
+            
+            const dateInput = document.getElementById('bookingDate');
+            const timeInput = document.getElementById('bookingTime');
+            
+            if (!dateInput.value || !timeInput.value) return null;
+            
+            // Prima prova il controllo online
+            const onlineCheck = await checkAvailabilityOnline(selectedService.id, dateInput.value, timeInput.value);
+            if (onlineCheck) {
+                return onlineCheck;
+            }
+            
+            // Fallback: controllo locale
+            const key = getBookingKey(selectedService.id, dateInput.value, timeInput.value);
+            const currentBookings = bookings[key] || 0;
+            
+            if (currentBookings >= selectedService.maxBookingsPerSlot) {
+                return { status: 'unavailable', remaining: 0, available: false };
+            } else if (currentBookings >= selectedService.maxBookingsPerSlot - 1) {
+                return { status: 'limited', remaining: selectedService.maxBookingsPerSlot - currentBookings, available: true };
+            } else {
+                return { status: 'available', remaining: selectedService.maxBookingsPerSlot - currentBookings, available: true };
+            }
+        }
+
+        // Funzione per aggiornare l'indicatore di disponibilità
+        async function updateAvailability() {
+            const availabilityDiv = document.getElementById('availabilityIndicator');
+            const dateInput = document.getElementById('bookingDate');
+            
+            // Controllo giorni di chiusura (Domenica = 0, Lunedì = 1)
+            if (dateInput.value) {
+                const selectedDate = new Date(dateInput.value + 'T12:00:00');
+                const dayOfWeek = selectedDate.getDay();
+                
+                if (dayOfWeek === 0 || dayOfWeek === 1) {
+                    availabilityDiv.className = 'availability-indicator unavailable';
+                    availabilityDiv.textContent = '✗ Il centro è chiuso in questo giorno';
+                    alert('Il centro è chiuso di Domenica e Lunedì. Si prega di scegliere un altro giorno.');
+                    dateInput.value = '';
+                    return;
+                }
+            }
+            
+            // Mostra loading
+            availabilityDiv.className = 'availability-indicator';
+            availabilityDiv.textContent = '🔄 Controllo disponibilità in tempo reale...';
+            
+            const availability = await checkAvailability();
+            
+            if (availability) {
+                availabilityDiv.className = `availability-indicator ${availability.status}`;
+                
+                switch (availability.status) {
+                    case 'available':
+                        availabilityDiv.textContent = `✓ Disponibile (${availability.remaining} posti liberi)`;
+                        break;
+                    case 'limited':
+                        availabilityDiv.textContent = `⚠ Ultimi ${availability.remaining} posti disponibili`;
+                        break;
+                    case 'unavailable':
+                        availabilityDiv.textContent = '✗ Non disponibile per questo orario';
+                        break;
+                }
+            } else {
+                availabilityDiv.textContent = '';
+                availabilityDiv.className = 'availability-indicator';
+            }
+        }
+
+        // Funzione per effettuare la prenotazione
+        async function bookSelectedService() {
+            if (!selectedService) {
+                alert('Seleziona prima un trattamento.');
+                return;
+            }
+            
+            const nameInput = document.getElementById('customerName');
+            const phoneInput = document.getElementById('customerPhone');
+            const dateInput = document.getElementById('bookingDate');
+            const timeInput = document.getElementById('bookingTime');
+            
+            if (!dateInput.value || !timeInput.value || !nameInput.value || !phoneInput.value) {
+                alert('Per favore, compila tutti i campi per procedere con la prenotazione.');
+                return;
+            }
+            
+            // Mostra loading
+            const bookBtn = document.getElementById('mainBookBtn');
+            const originalText = bookBtn.innerHTML;
+            bookBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifica disponibilità...';
+            bookBtn.disabled = true;
+            
+            const availability = await checkAvailability();
+            
+            if (!availability || !availability.available) {
+                alert('Spiacenti, questo orario non è più disponibile. Seleziona un altro orario.');
+                bookBtn.innerHTML = originalText;
+                bookBtn.disabled = false;
+                return;
+            }
+            
+            // 📊 TRACCIA TENTATIVO DI PRENOTAZIONE
+            trackEvent('Booking Attempt', {
+                service_id: selectedService.id,
+                service_name: selectedService.title,
+                price: selectedService.price,
+                duration: selectedService.duration,
+                customer_name: nameInput.value,
+                booking_date: dateInput.value,
+                booking_time: timeInput.value,
+                availability_status: availability.status
+            });
+            
+            // Salva la prenotazione su Google Sheets
+            bookBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvataggio prenotazione...';
+            
+            const bookingData = {
+                serviceId: selectedService.id,
+                serviceName: selectedService.title,
+                price: selectedService.price,
+                date: dateInput.value,
+                time: timeInput.value,
+                customerName: nameInput.value,
+                customerPhone: phoneInput.value,
+                timestamp: new Date().toISOString()
+            };
+            
+            const saveResult = await saveBookingToGoogle(bookingData);
+            
+            if (!saveResult.success) {
+                alert('Errore nel salvataggio della prenotazione. Riprova più tardi.');
+                bookBtn.innerHTML = originalText;
+                bookBtn.disabled = false;
+                return;
+            }
+            
+            // Formatta la data
+            const date = new Date(dateInput.value);
+            const formattedDate = date.toLocaleDateString('it-IT', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+            
+            // Crea il messaggio WhatsApp
+            const message = `🌸 *PRENOTAZIONE CHIARA BEAUTY BOUTIQUE* 🌸
+
+👤 *Nome:* ${nameInput.value}
+📱 *Telefono:* ${phoneInput.value}
+
+💆‍♀️ *Trattamento:* ${selectedService.title}
+📅 *Data:* ${formattedDate}
+🕐 *Orario:* ${timeInput.value}
+⏱ *Durata:* ${selectedService.duration} minuti
+💰 *Prezzo:* €${selectedService.price}
+
+📍 *Centro Estetico:* Via Roma 133, Nardò (Lecce)
+🆔 *Codice Prenotazione:* ${saveResult.bookingId}
+
+Confermo la mia prenotazione per il trattamento selezionato. Grazie! ✨`;
+            
+            // Apri WhatsApp con il messaggio
+            const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+            window.open(whatsappUrl, '_blank');
+            
+            // 📊 TRACCIA COMPLETAMENTO PRENOTAZIONE
+            trackEvent('Booking Completed', {
+                service_id: selectedService.id,
+                service_name: selectedService.title,
+                price: selectedService.price,
+                duration: selectedService.duration,
+                booking_date: formattedDate,
+                booking_time: timeInput.value,
+                revenue: selectedService.price,
+                booking_id: saveResult.bookingId
+            });
+            
+            // Reset UI
+            bookBtn.innerHTML = originalText;
+            bookBtn.disabled = false;
+            
+            // Mostra il popup per la consulenza nutrizionale dopo un breve ritardo
+            setTimeout(() => {
+                showNutritionistPopup();
+            }, 1500);
+            
+            // Aggiorna la disponibilità
+            updateAvailability();
+            
+            // Reset del form e selezione
+            document.getElementById('mainBookingForm').reset();
+            document.getElementById('selectedServiceInfo').classList.remove('show');
+            document.getElementById('noServiceSelected').style.display = 'block';
+            document.getElementById('mainBookingForm').style.display = 'none';
+            document.getElementById('mainBookBtn').style.display = 'none';
+            
+            // Rimuovi selezione servizio
+            document.querySelectorAll('.service-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            selectedService = null;
+        }
+
+        // FUNZIONI PER IL POPUP NUTRIZIONISTA
+        function showNutritionistPopup() {
+            document.getElementById('nutritionistPopup').classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeNutritionistPopup() {
+            document.getElementById('nutritionistPopup').classList.remove('show');
+            document.body.style.overflow = 'auto';
+        }
+
+        function acceptNutritionistOffer(event) {
+            event.preventDefault();
+            const name = document.getElementById('customerName').value || 'Cliente';
+
+            // 📊 TRACCIA INTERESSE CONSULENZA NUTRIZIONALE
+            trackEvent('Nutritionist Interest', {
+                customer_name: name,
+                source: 'post_booking_popup'
+            });
+
+            const message = `Ciao! Sono ${name}, ho appena prenotato un trattamento estetico presso Chiara Beauty Boutique e vorrei approfittare dell'offerta speciale sulla consulenza nutrizionale. Puoi fornirmi maggiori dettagli? Grazie!`;
+
+            const whatsappUrl = `https://wa.me/393665068384?text=${encodeURIComponent(message)}`;
+
+            window.open(whatsappUrl, '_blank');
+            closeNutritionistPopup();
+        }
+
+        function declineNutritionistOffer() {
+            // 📊 TRACCIA RIFIUTO CONSULENZA NUTRIZIONALE
+            trackEvent('Nutritionist Declined', {
+                source: 'post_booking_popup'
+            });
+            closeNutritionistPopup();
+        }
+
+        // Orari di apertura aggiornati
+        function generateTimeSlots() {
+            const slots = [];
+            // Fascia Mattutina: 09:30 - 13:30
+            for (let h = 9; h <= 13; h++) {
+                for (let m = 0; m < 60; m += 30) {
+                    if (h === 9 && m < 30) continue;
+                    if (h === 13 && m > 30) continue;
+                    slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+                }
+            }
+            // Fascia Pomeridiana: 16:00 - 20:00
+            for (let h = 16; h <= 20; h++) {
+                for (let m = 0; m < 60; m += 30) {
+                    if (h === 20 && m > 0) continue;
+                     slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+                }
+            }
+            return slots;
+        }
+
+        function getMinDate() {
+            return new Date().toISOString().split('T')[0];
+        }
+
+        function generateServiceCards() {
+            const container = document.getElementById('servicesGrid');
+            services.forEach(service => {
+                const card = document.createElement('div');
+                card.className = 'service-card';
+                card.setAttribute('data-service-id', service.id);
+                card.onclick = () => selectService(service.id);
+                card.innerHTML = `<h3 class="service-title">${service.title}</h3><p class="service-description">${service.description}</p><div class="service-details"><span class="price">€${service.price}</span><span class="duration">${service.duration} minuti</span></div><div class="select-service-text">👆 Clicca per selezionare</div>`;
+                container.appendChild(card);
+            });
+        }
+
+        function populateTimeSlots() {
+            const timeSelect = document.getElementById('bookingTime');
+            // Svuota le opzioni esistenti prima di ripopolare
+            timeSelect.innerHTML = '<option value="">Seleziona orario</option>';
+            generateTimeSlots().forEach(time => {
+                const option = document.createElement('option');
+                option.value = time;
+                option.textContent = time;
+                timeSelect.appendChild(option);
+            });
+        }
+
+        // Inizializzazione della pagina
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Carica prenotazioni da Google Sheets
+            await loadBookingsFromGoogle();
+            
+            generateServiceCards();
+            populateTimeSlots();
+            document.getElementById('bookingDate').min = getMinDate();
+      
+            // 📊 TRACCIA VISITA PAGINA PRENOTAZIONI
             trackEvent('Page View', {
                 page: 'booking',
                 timestamp: new Date().toISOString(),
-                existing_bookings: Object.keys(bookings).length,
-                connection_status: isConnected ? 'online' : 'offline'
+                existing_bookings: Object.keys(bookings).length
             });
-        }
-        
-        // Event listeners per link esterni
-        setupExternalLinkTracking();
-        
-        console.log('✅ Inizializzazione completata');
-        showNotification('Sistema prenotazioni caricato', 'success');
-        
-    } catch (error) {
-        console.error('❌ Errore inizializzazione:', error);
-        showNotification('Errore durante il caricamento. Alcune funzioni potrebbero non essere disponibili.', 'error');
-    }
-});
+            
+            // 📊 TRACCIA CLICK SU LINK ESTERNI
+            document.addEventListener('click', function(e) {
+                const instagramLink = e.target.closest('a[href*="instagram.com"]');
+                if (instagramLink) {
+                    trackEvent('External Link Click', {
+                        link_type: 'instagram',
+                        url: instagramLink.href
+                    });
+                }
+                
+                const mapLink = e.target.closest('a[href*="maps.app.goo.gl"]');
+                if (mapLink) {
+                    trackEvent('External Link Click', {
+                        link_type: 'google_maps',
+                        url: mapLink.href
+                    });
+                }
+                
+                const nutritionistLink = e.target.closest('a[href*="wa.me/393665068384"]');
+                if (nutritionistLink) {
+                    trackEvent('Nutritionist Contact', {
+                        source: 'main_section',
+                        contact_method: 'whatsapp'
+                    });
+                }
+            });
+        });
 
-// 📊 SETUP TRACKING LINK ESTERNI
-function setupExternalLinkTracking() {
-    if (typeof trackEvent !== 'function') return;
-    
-    document.addEventListener('click', function(e) {
-        try {
-            const instagramLink = e.target.closest('a[href*="instagram.com"]');
-            if (instagramLink) {
-                trackEvent('External Link Click', {
-                    link_type: 'instagram',
-                    url: instagramLink.href
-                });
-            }
-            
-            const mapLink = e.target.closest('a[href*="maps.app.goo.gl"]');
-            if (mapLink) {
-                trackEvent('External Link Click', {
-                    link_type: 'google_maps',
-                    url: mapLink.href
-                });
-            }
-            
-            const nutritionistLink = e.target.closest('a[href*="wa.me/393665068384"]');
-            if (nutritionistLink) {
-                trackEvent('Nutritionist Contact', {
-                    source: 'main_section',
-                    contact_method: 'whatsapp'
-                });
-            }
-        } catch (error) {
-            console.error('❌ Errore tracking link:', error);
-        }
-    });
-}
-        
+    </script>
+
 </body>
 </html>
