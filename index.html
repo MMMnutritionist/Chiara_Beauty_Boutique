@@ -349,7 +349,6 @@
             box-shadow: 0 10px 25px rgba(37, 211, 102, 0.3);
         }
 
-        /* POPUP STYLES - DIMENSIONI RIDOTTE */
         .popup-overlay {
             position: fixed;
             top: 0;
@@ -473,7 +472,6 @@
             transform: translateY(-2px);
         }
         
-        /* NUOVO STILE PER SEZIONE ORARI */
         .opening-hours-section {
             background: white;
             padding: 40px;
@@ -685,7 +683,7 @@
         </div>
     </div>
 
-    <!-- Vercel Web Analytics per siti HTML statici -->
+    <!-- Vercel Web Analytics -->
     <script>
         window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
     </script>
@@ -697,7 +695,6 @@
             if (window.va) {
                 window.va('track', eventName, properties);
             }
-            // Backup: log in console per debug
             console.log('📊 Analytics Event:', eventName, properties);
         }
 
@@ -756,18 +753,188 @@
         // Numero WhatsApp del centro
         const WHATSAPP_NUMBER = '393513122638';
 
-        
-            // Formatta la data
-            const date = new Date(dateInput.value);
-            const formattedDate = date.toLocaleDateString('it-IT', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-            });
+        // Variabile globale per il servizio selezionato
+        let selectedService = null;
+
+        // Storage in memoria per le prenotazioni (sostituisce localStorage)
+        let bookings = {};
+
+        // Funzione per caricare prenotazioni (simulata, dato che l'API non funziona)
+        async function loadBookingsFromGoogle() {
+            console.log('🔄 Caricamento prenotazioni simulato...');
+            // Simula alcune prenotazioni per il testing
+            bookings = {
+                '2024-08-17': {
+                    '10:00': ['test1'],
+                    '14:30': ['test2', 'test3']
+                }
+            };
+            console.log('✅ Prenotazioni caricate (simulazione)');
+        }
+
+        // Funzione per salvare prenotazione (simulata)
+        async function saveBookingToGoogle(bookingData) {
+            console.log('💾 Salvataggio prenotazione simulato:', bookingData);
             
-            // Crea il messaggio WhatsApp
-            const message = `🌸 *PRENOTAZIONE CHIARA BEAUTY BOUTIQUE* 🌸
+            // Simula il salvataggio
+            const dateKey = bookingData.date;
+            const timeKey = bookingData.time;
+            
+            if (!bookings[dateKey]) {
+                bookings[dateKey] = {};
+            }
+            if (!bookings[dateKey][timeKey]) {
+                bookings[dateKey][timeKey] = [];
+            }
+            
+            const bookingId = 'BOOK-' + Date.now();
+            bookings[dateKey][timeKey].push(bookingId);
+            
+            return {
+                success: true,
+                bookingId: bookingId
+            };
+        }
+
+        // Funzione per selezionare un servizio
+        function selectService(serviceId) {
+            selectedService = services.find(s => s.id === serviceId);
+            
+            if (selectedService) {
+                // Aggiorna UI
+                document.querySelectorAll('.service-card').forEach(card => {
+                    card.classList.remove('selected');
+                });
+                document.querySelector(`[data-service-id="${serviceId}"]`).classList.add('selected');
+                
+                // Mostra info servizio selezionato
+                document.getElementById('selectedServiceName').textContent = selectedService.title;
+                document.getElementById('selectedServiceDetails').textContent = `€${selectedService.price} - ${selectedService.duration} minuti`;
+                document.getElementById('selectedServiceInfo').classList.add('show');
+                
+                // Mostra form
+                document.getElementById('noServiceSelected').style.display = 'none';
+                document.getElementById('mainBookingForm').style.display = 'grid';
+                document.getElementById('mainBookBtn').style.display = 'flex';
+                
+                // Aggiorna disponibilità
+                updateAvailability();
+                
+                // Traccia selezione servizio
+                trackEvent('Service Selected', {
+                    service_id: selectedService.id,
+                    service_name: selectedService.title,
+                    price: selectedService.price
+                });
+            }
+        }
+
+        // Funzione per aggiornare la disponibilità
+        function updateAvailability() {
+            const dateInput = document.getElementById('bookingDate');
+            const timeInput = document.getElementById('bookingTime');
+            const indicator = document.getElementById('availabilityIndicator');
+            
+            if (!dateInput.value || !timeInput.value || !selectedService) {
+                indicator.innerHTML = '';
+                return;
+            }
+            
+            const selectedDate = dateInput.value;
+            const selectedTime = timeInput.value;
+            
+            // Controlla se è una domenica o lunedì (centro chiuso)
+            const date = new Date(selectedDate);
+            const dayOfWeek = date.getDay();
+            if (dayOfWeek === 0 || dayOfWeek === 1) { // 0 = Domenica, 1 = Lunedì
+                indicator.innerHTML = '❌ Centro chiuso Domenica e Lunedì';
+                indicator.className = 'availability-indicator unavailable';
+                return;
+            }
+            
+            // Controlla prenotazioni esistenti
+            const existingBookings = bookings[selectedDate] && bookings[selectedDate][selectedTime] 
+                ? bookings[selectedDate][selectedTime].length 
+                : 0;
+            
+            const maxBookings = selectedService.maxBookingsPerSlot;
+            const availableSlots = maxBookings - existingBookings;
+            
+            if (availableSlots <= 0) {
+                indicator.innerHTML = '❌ Orario non disponibile';
+                indicator.className = 'availability-indicator unavailable';
+            } else if (availableSlots === 1) {
+                indicator.innerHTML = '⚠️ Ultimo posto disponibile!';
+                indicator.className = 'availability-indicator limited';
+            } else {
+                indicator.innerHTML = `✅ ${availableSlots} posti disponibili`;
+                indicator.className = 'availability-indicator available';
+            }
+        }
+
+        // Funzione per prenotare il servizio selezionato
+        async function bookSelectedService() {
+            if (!selectedService) {
+                alert('Seleziona prima un servizio');
+                return;
+            }
+            
+            const nameInput = document.getElementById('customerName');
+            const phoneInput = document.getElementById('customerPhone');
+            const dateInput = document.getElementById('bookingDate');
+            const timeInput = document.getElementById('bookingTime');
+            
+            // Validazione
+            if (!nameInput.value || !phoneInput.value || !dateInput.value || !timeInput.value) {
+                alert('Compila tutti i campi obbligatori');
+                return;
+            }
+            
+            // Controlla disponibilità finale
+            const selectedDate = dateInput.value;
+            const selectedTime = timeInput.value;
+            const existingBookings = bookings[selectedDate] && bookings[selectedDate][selectedTime] 
+                ? bookings[selectedDate][selectedTime].length 
+                : 0;
+            
+            if (existingBookings >= selectedService.maxBookingsPerSlot) {
+                alert('Spiacenti, questo orario non è più disponibile. Scegli un altro orario.');
+                updateAvailability();
+                return;
+            }
+            
+            const bookBtn = document.getElementById('mainBookBtn');
+            const originalText = bookBtn.innerHTML;
+            bookBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Prenotazione in corso...';
+            bookBtn.disabled = true;
+            
+            try {
+                // Salva prenotazione
+                const bookingData = {
+                    name: nameInput.value,
+                    phone: phoneInput.value,
+                    service: selectedService.id,
+                    date: selectedDate,
+                    time: selectedTime
+                };
+                
+                const saveResult = await saveBookingToGoogle(bookingData);
+                
+                if (!saveResult.success) {
+                    throw new Error('Errore nel salvataggio');
+                }
+                
+                // Formatta la data
+                const date = new Date(dateInput.value);
+                const formattedDate = date.toLocaleDateString('it-IT', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                });
+                
+                // Crea il messaggio WhatsApp
+                const message = `🌸 *PRENOTAZIONE CHIARA BEAUTY BOUTIQUE* 🌸
 
 👤 *Nome:* ${nameInput.value}
 📱 *Telefono:* ${phoneInput.value}
@@ -782,47 +949,55 @@
 🆔 *Codice Prenotazione:* ${saveResult.bookingId}
 
 Confermo la mia prenotazione per il trattamento selezionato. Grazie! ✨`;
-            
-            // Apri WhatsApp con il messaggio
-            const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
-            window.open(whatsappUrl, '_blank');
-            
-            // 📊 TRACCIA COMPLETAMENTO PRENOTAZIONE
-            trackEvent('Booking Completed', {
-                service_id: selectedService.id,
-                service_name: selectedService.title,
-                price: selectedService.price,
-                duration: selectedService.duration,
-                booking_date: formattedDate,
-                booking_time: timeInput.value,
-                revenue: selectedService.price,
-                booking_id: saveResult.bookingId
-            });
-            
-            // Reset UI
-            bookBtn.innerHTML = originalText;
-            bookBtn.disabled = false;
-            
-            // Mostra il popup per la consulenza nutrizionale dopo un breve ritardo
-            setTimeout(() => {
-                showNutritionistPopup();
-            }, 1500);
-            
-            // Aggiorna la disponibilità
-            updateAvailability();
-            
-            // Reset del form e selezione
-            document.getElementById('mainBookingForm').reset();
-            document.getElementById('selectedServiceInfo').classList.remove('show');
-            document.getElementById('noServiceSelected').style.display = 'block';
-            document.getElementById('mainBookingForm').style.display = 'none';
-            document.getElementById('mainBookBtn').style.display = 'none';
-            
-            // Rimuovi selezione servizio
-            document.querySelectorAll('.service-card').forEach(card => {
-                card.classList.remove('selected');
-            });
-            selectedService = null;
+                
+                // Apri WhatsApp con il messaggio
+                const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+                window.open(whatsappUrl, '_blank');
+                
+                // Traccia completamento prenotazione
+                trackEvent('Booking Completed', {
+                    service_id: selectedService.id,
+                    service_name: selectedService.title,
+                    price: selectedService.price,
+                    duration: selectedService.duration,
+                    booking_date: formattedDate,
+                    booking_time: timeInput.value,
+                    revenue: selectedService.price,
+                    booking_id: saveResult.bookingId
+                });
+                
+                // Reset UI
+                bookBtn.innerHTML = originalText;
+                bookBtn.disabled = false;
+                
+                // Mostra il popup per la consulenza nutrizionale dopo un breve ritardo
+                setTimeout(() => {
+                    showNutritionistPopup();
+                }, 1500);
+                
+                // Aggiorna la disponibilità
+                updateAvailability();
+                
+                // Reset del form e selezione
+                document.getElementById('mainBookingForm').reset();
+                document.getElementById('selectedServiceInfo').classList.remove('show');
+                document.getElementById('noServiceSelected').style.display = 'block';
+                document.getElementById('mainBookingForm').style.display = 'none';
+                document.getElementById('mainBookBtn').style.display = 'none';
+                
+                // Rimuovi selezione servizio
+                document.querySelectorAll('.service-card').forEach(card => {
+                    card.classList.remove('selected');
+                });
+                selectedService = null;
+                
+            } catch (error) {
+                console.error('❌ Errore prenotazione:', error);
+                alert('Errore durante la prenotazione. Riprova o contatta il centro direttamente.');
+                
+                bookBtn.innerHTML = originalText;
+                bookBtn.disabled = false;
+            }
         }
 
         // FUNZIONI PER IL POPUP NUTRIZIONISTA
@@ -840,7 +1015,7 @@ Confermo la mia prenotazione per il trattamento selezionato. Grazie! ✨`;
             event.preventDefault();
             const name = document.getElementById('customerName').value || 'Cliente';
 
-            // 📊 TRACCIA INTERESSE CONSULENZA NUTRIZIONALE
+            // Traccia interesse consulenza nutrizionale
             trackEvent('Nutritionist Interest', {
                 customer_name: name,
                 source: 'post_booking_popup'
@@ -855,14 +1030,14 @@ Confermo la mia prenotazione per il trattamento selezionato. Grazie! ✨`;
         }
 
         function declineNutritionistOffer() {
-            // 📊 TRACCIA RIFIUTO CONSULENZA NUTRIZIONALE
+            // Traccia rifiuto consulenza nutrizionale
             trackEvent('Nutritionist Declined', {
                 source: 'post_booking_popup'
             });
             closeNutritionistPopup();
         }
 
-        // Orari di apertura aggiornati
+        // Funzione per generare gli slot orari
         function generateTimeSlots() {
             const slots = [];
             // Fascia Mattutina: 09:30 - 13:30
@@ -877,7 +1052,7 @@ Confermo la mia prenotazione per il trattamento selezionato. Grazie! ✨`;
             for (let h = 16; h <= 20; h++) {
                 for (let m = 0; m < 60; m += 30) {
                     if (h === 20 && m > 0) continue;
-                     slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+                    slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
                 }
             }
             return slots;
@@ -894,7 +1069,15 @@ Confermo la mia prenotazione per il trattamento selezionato. Grazie! ✨`;
                 card.className = 'service-card';
                 card.setAttribute('data-service-id', service.id);
                 card.onclick = () => selectService(service.id);
-                card.innerHTML = `<h3 class="service-title">${service.title}</h3><p class="service-description">${service.description}</p><div class="service-details"><span class="price">€${service.price}</span><span class="duration">${service.duration} minuti</span></div><div class="select-service-text">👆 Clicca per selezionare</div>`;
+                card.innerHTML = `
+                    <h3 class="service-title">${service.title}</h3>
+                    <p class="service-description">${service.description}</p>
+                    <div class="service-details">
+                        <span class="price">€${service.price}</span>
+                        <span class="duration">${service.duration} minuti</span>
+                    </div>
+                    <div class="select-service-text">👆 Clicca per selezionare</div>
+                `;
                 container.appendChild(card);
             });
         }
@@ -913,21 +1096,21 @@ Confermo la mia prenotazione per il trattamento selezionato. Grazie! ✨`;
 
         // Inizializzazione della pagina
         document.addEventListener('DOMContentLoaded', async function() {
-            // Carica prenotazioni da Google Sheets
+            // Carica prenotazioni (simulato)
             await loadBookingsFromGoogle();
             
             generateServiceCards();
             populateTimeSlots();
             document.getElementById('bookingDate').min = getMinDate();
       
-            // 📊 TRACCIA VISITA PAGINA PRENOTAZIONI
+            // Traccia visita pagina prenotazioni
             trackEvent('Page View', {
                 page: 'booking',
                 timestamp: new Date().toISOString(),
                 existing_bookings: Object.keys(bookings).length
             });
             
-            // 📊 TRACCIA CLICK SU LINK ESTERNI
+            // Traccia click su link esterni
             document.addEventListener('click', function(e) {
                 const instagramLink = e.target.closest('a[href*="instagram.com"]');
                 if (instagramLink) {
@@ -954,10 +1137,7 @@ Confermo la mia prenotazione per il trattamento selezionato. Grazie! ✨`;
                 }
             });
         });
-
     </script>
-
-<script src="script.js"></script>
 
 </body>
 </html>
