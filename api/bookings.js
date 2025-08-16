@@ -1,120 +1,107 @@
-// /api/bookings.js
-export default async function handler(req, res) {
-  // ✅ CORS headers per evitare problemi di cross-origin
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+// ==========================
+// 📄 Booking Google Apps Script
+// ==========================
 
-  // ✅ Gestione preflight OPTIONS
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+// Costante: nome del foglio dove salvare le prenotazioni
+const SHEET_NAME = "Prenotazioni";
 
+// ==========================
+// 📥 DO GET - Lettura prenotazioni / verifica disponibilità
+// ==========================
+function doGet(e) {
   try {
-    const baseUrl = 'https://script.google.com/macros/s/AKfycbwEcn-7d0Z8zCeUfb-ppyWOp6-oQ0-L4C7jOPIPWDCrQFDgIuLO9ysv6Yf9gpl2had7SQ/exec';
-    const query = req.url.split('?')[1] || '';
-    const scriptUrl = `${baseUrl}${query ? '?' + query : ''}`;
-    
-    console.log('📡 Request method:', req.method);
-    console.log('📡 Request URL:', req.url);
+    const action = e.parameter.action;
 
-    if (req.method === 'POST') {
-      const body = await new Promise((resolve) => {
-        let data = '';
-        req.on('data', chunk => { data += chunk; });
-        req.on('end', () => resolve(data));
-      });
-      // ✅ Gestione corretta del body per POST
-      let body;
-      
-      if (typeof req.body === 'string') {
-        body = req.body;
-      } else if (req.body && typeof req.body === 'object') {
-        body = JSON.stringify(req.body);
-      } else {
-        // ✅ Fallback per leggere il body manualmente
-        body = await new Promise((resolve) => {
-          let data = '';
-          req.on('data', chunk => { data += chunk; });
-          req.on('end', () => resolve(data));
-        });
-      }
-
-      console.log('📤 Sending POST to Google Script with body:', body);
-
-      const response = await fetch(baseUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body
-        headers: { 
-          'Content-Type': 'application/json',
-        },
-        body: body
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Google Script POST error:', response.status, errorText);
-        return res.status(response.status).json({ 
-          success: false,
-          error: 'Errore dal Google Script', 
-          details: errorText,
-          status: response.status
-        });
-      }
-
-      const data = await response.json();
-      console.log('✅ Google Script POST response:', data);
-      return res.status(200).json(data);
+    if (action === "getBookings") {
+      const bookings = getBookingsFromSheet();
+      return jsonResponse({ success: true, data: { bookings } });
     }
 
-    const response = await fetch(scriptUrl);
-    if (!response.ok) {
-      return res.status(response.status).json({ error: 'Errore dal Google Script' });
-    // ✅ Gestione GET con query parameters corretta
-    if (req.method === 'GET') {
-      // Estrai i query parameters dall'URL
-      const url = new URL(req.url, `https://${req.headers.host}`);
-      const queryString = url.search; // Include il '?' se presente
-      const scriptUrl = `${baseUrl}${queryString}`;
-      
-      console.log('📤 Sending GET to Google Script:', scriptUrl);
-
-      const response = await fetch(scriptUrl);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Google Script GET error:', response.status, errorText);
-        return res.status(response.status).json({ 
-          success: false,
-          error: 'Errore dal Google Script', 
-          details: errorText,
-          status: response.status
-        });
-      }
-
-      const data = await response.json();
-      console.log('✅ Google Script GET response:', data);
-      return res.status(200).json(data);
+    if (action === "checkAvailability") {
+      const serviceId = e.parameter.serviceId;
+      const date = e.parameter.date;
+      const time = e.parameter.time;
+      const available = checkAvailability(serviceId, date, time);
+      return jsonResponse({ success: true, data: { available } });
     }
 
-    const data = await response.json();
-    res.status(200).json(data);
-    // ✅ Metodo non supportato
-    return res.status(405).json({ 
-      success: false,
-      error: 'Metodo non supportato', 
-      method: req.method 
-    });
-
-  } catch (error) {
-    res.status(500).json({ error: 'Server error', details: error.message });
-    console.error('❌ Server error:', error);
-    return res.status(500).json({ 
-      success: false,
-      error: 'Server error', 
-      details: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+    throw new Error("Azione non valida");
+  } catch (err) {
+    return jsonResponse({ success: false, message: err.message });
   }
+}
+
+// ==========================
+// 📤 DO POST - Salvataggio prenotazione
+// ==========================
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const bookingId = saveBookingToSheet(data);
+    return jsonResponse({ success: true, data: { bookingId } });
+  } catch (err) {
+    return jsonResponse({ success: false, message: err.message });
+  }
+}
+
+// ==========================
+// 🔑 Funzioni helper
+// ==========================
+function jsonResponse(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// Legge tutte le prenotazioni dal foglio
+function getBookingsFromSheet() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sheet) return {};
+
+  const data = sheet.getDataRange().getValues();
+  const headers = data.shift(); // prima riga = intestazioni
+
+  const bookings = {};
+  data.forEach(row => {
+    const rowObj = {};
+    headers.forEach((h, i) => rowObj[h] = row[i]);
+    const key = `${rowObj.serviceId}_${rowObj.date}_${rowObj.time}`;
+    bookings[key] = (bookings[key] || 0) + 1;
+  });
+  return bookings;
+}
+
+// Salva una prenotazione nel foglio e restituisce un ID univoco
+function saveBookingToSheet(booking) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sheet) throw new Error("Foglio prenotazioni non trovato");
+
+  const bookingId = 'BKG-' + Date.now();
+  const row = [
+    bookingId,
+    booking.serviceId,
+    booking.date,
+    booking.time,
+    booking.name || "",
+    booking.email || "",
+    booking.phone || "",
+    booking.note || ""
+  ];
+  
+  // Se il foglio è vuoto, scrivi intestazioni
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['bookingId','serviceId','date','time','name','email','phone','note']);
+  }
+
+  sheet.appendRow(row);
+  return bookingId;
+}
+
+// Controlla se un orario è disponibile
+function checkAvailability(serviceId, date, time) {
+  const bookings = getBookingsFromSheet();
+  const key = `${serviceId}_${date}_${time}`;
+  // Qui puoi settare max prenotazioni per slot, esempio 1
+  const MAX_PER_SLOT = 1;
+  return (bookings[key] || 0) < MAX_PER_SLOT;
 }
