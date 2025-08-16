@@ -1,102 +1,107 @@
 // ==========================
-// ✅ CONFIG
+// 📄 Booking Google Apps Script
 // ==========================
-const GOOGLE_APPS_SCRIPT_URL = '/api/bookings';
 
-let bookings = {};            // Cache locale
-let lastCacheUpdate = null;   // Timestamp ultimo aggiornamento
+// Costante: nome del foglio dove salvare le prenotazioni
+const SHEET_NAME = "Prenotazioni";
 
 // ==========================
-// 🔄 CARICAMENTO PRENOTAZIONI DAL PROXY
+// 📥 DO GET - Lettura prenotazioni / verifica disponibilità
 // ==========================
-async function loadBookingsFromGoogle() {
-    try {
-        console.log('🔄 Caricamento prenotazioni dal proxy Vercel...');
-        const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?action=getBookings`);
-        const result = await response.json();
+function doGet(e) {
+  try {
+    const action = e.parameter.action;
 
-        if (result.success) {
-            bookings = result.data.bookings || {};
-            lastCacheUpdate = Date.now();
-            console.log('✅ Prenotazioni caricate:', Object.keys(bookings).length);
-            return true;
-        } else {
-            throw new Error(result.message || 'Errore sconosciuto durante il caricamento.');
-        }
-    } catch (error) {
-        console.error('❌ Errore caricamento dal proxy:', error);
-        bookings = {};
-        return false;
+    if (action === "getBookings") {
+      const bookings = getBookingsFromSheet();
+      return jsonResponse({ success: true, data: { bookings } });
     }
-}
 
-// ==========================
-// 💾 SALVATAGGIO PRENOTAZIONE TRAMITE PROXY
-// ==========================
-async function saveBookingToGoogle(bookingData) {
-    try {
-        console.log('💾 Salvataggio prenotazione tramite proxy Vercel...');
-        const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(bookingData)
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            console.log('✅ Prenotazione salvata:', result.data.bookingId);
-
-            // Aggiorna cache locale
-            const key = getBookingKey(bookingData.serviceId, bookingData.date, bookingData.time);
-            bookings[key] = (bookings[key] || 0) + 1;
-
-            return { success: true, bookingId: result.data.bookingId };
-        } else {
-            throw new Error(result.message || 'Errore sconosciuto durante il salvataggio.');
-        }
-    } catch (error) {
-        console.error('❌ Errore salvataggio tramite proxy:', error);
-
-        // Fallback: ID temporaneo e aggiornamento cache locale
-        const bookingId = 'TEMP-' + Date.now();
-        const key = getBookingKey(bookingData.serviceId, bookingData.date, bookingData.time);
-        bookings[key] = (bookings[key] || 0) + 1;
-
-        return { success: true, bookingId };
+    if (action === "checkAvailability") {
+      const serviceId = e.parameter.serviceId;
+      const date = e.parameter.date;
+      const time = e.parameter.time;
+      const available = checkAvailability(serviceId, date, time);
+      return jsonResponse({ success: true, data: { available } });
     }
+
+    throw new Error("Azione non valida");
+  } catch (err) {
+    return jsonResponse({ success: false, message: err.message });
+  }
 }
 
 // ==========================
-// 📅 VERIFICA DISPONIBILITÀ ONLINE
+// 📤 DO POST - Salvataggio prenotazione
 // ==========================
-async function checkAvailabilityOnline(serviceId, date, time) {
-    try {
-        const url = `${GOOGLE_APPS_SCRIPT_URL}?action=checkAvailability&serviceId=${serviceId}&date=${date}&time=${time}`;
-        const response = await fetch(url);
-        const result = await response.json();
-
-        if (result.success) {
-            return result.data; // { booked: number }
-        } else {
-            throw new Error(result.message || 'Errore verifica disponibilità.');
-        }
-    } catch (error) {
-        console.error('❌ Errore verifica disponibilità tramite proxy:', error);
-        return null;
-    }
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const bookingId = saveBookingToSheet(data);
+    return jsonResponse({ success: true, data: { bookingId } });
+  } catch (err) {
+    return jsonResponse({ success: false, message: err.message });
+  }
 }
 
 // ==========================
-// 🔑 GENERATORE DI CHIAVI PER CACHE
+// 🔑 Funzioni helper
 // ==========================
-function getBookingKey(serviceId, date, time) {
-    return `${serviceId}_${date}_${time}`;
+function jsonResponse(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
-// ==========================
-// 🚀 AVVIO INIZIALE AL CARICAMENTO PAGINA
-// ==========================
-document.addEventListener('DOMContentLoaded', () => {
-    loadBookingsFromGoogle();
-});
+// Legge tutte le prenotazioni dal foglio
+function getBookingsFromSheet() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sheet) return {};
+
+  const data = sheet.getDataRange().getValues();
+  const headers = data.shift(); // prima riga = intestazioni
+
+  const bookings = {};
+  data.forEach(row => {
+    const rowObj = {};
+    headers.forEach((h, i) => rowObj[h] = row[i]);
+    const key = `${rowObj.serviceId}_${rowObj.date}_${rowObj.time}`;
+    bookings[key] = (bookings[key] || 0) + 1;
+  });
+  return bookings;
+}
+
+// Salva una prenotazione nel foglio e restituisce un ID univoco
+function saveBookingToSheet(booking) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sheet) throw new Error("Foglio prenotazioni non trovato");
+
+  const bookingId = 'BKG-' + Date.now();
+  const row = [
+    bookingId,
+    booking.serviceId,
+    booking.date,
+    booking.time,
+    booking.name || "",
+    booking.email || "",
+    booking.phone || "",
+    booking.note || ""
+  ];
+  
+  // Se il foglio è vuoto, scrivi intestazioni
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['bookingId','serviceId','date','time','name','email','phone','note']);
+  }
+
+  sheet.appendRow(row);
+  return bookingId;
+}
+
+// Controlla se un orario è disponibile
+function checkAvailability(serviceId, date, time) {
+  const bookings = getBookingsFromSheet();
+  const key = `${serviceId}_${date}_${time}`;
+  // Qui puoi settare max prenotazioni per slot, esempio 1
+  const MAX_PER_SLOT = 1;
+  return (bookings[key] || 0) < MAX_PER_SLOT;
+}
