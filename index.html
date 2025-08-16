@@ -1,4 +1,708 @@
-<!DOCTYPE html>
+</style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <img src="https://i.imgur.com/8idnEmB.jpg" alt="Chiara Beauty Boutique Logo">
+            </div>
+            <h1>Chiara Beauty Boutique</h1>
+            <p class="subtitle">Centro di Estetica Avanzata</p>
+            <a href="https://maps.app.goo.gl/giW8pZUkchSUi1hj6" target="_blank" class="address">📍 Via Roma 133, Nardò (Lecce)</a>
+            <a href="https://www.instagram.com/chiara.beautyboutique?igsh=MXFieXZxamN6OXlsNQ==" target="_blank" class="instagram-link">
+                <i class="fab fa-instagram"></i>
+                @chiara.beautyboutique
+            </a>
+        </header>
+        
+        <div class="services-grid" id="servicesGrid">
+            <!-- I servizi verranno generati dinamicamente -->
+        </div>
+        
+        <section class="booking-section">
+            <h2 class="booking-title">Prenota il tuo Trattamento</h2>
+            
+            <div class="selected-service-info" id="selectedServiceInfo">
+                <div class="selected-service-name" id="selectedServiceName"></div>
+                <div class="selected-service-details" id="selectedServiceDetails"></div>
+            </div>
+            
+            <div class="no-service-selected" id="noServiceSelected">
+                <p>👆 Seleziona prima un trattamento dall'elenco qui sopra</p>
+            </div>
+            
+            <form class="booking-form" id="mainBookingForm" style="display: none;">
+                <div class="form-group">
+                    <label for="customerName">Nome *</label>
+                    <input type="text" id="customerName" required>
+                </div>
+                <div class="form-group">
+                    <label for="customerPhone">Telefono *</label>
+                    <input type="tel" id="customerPhone" required>
+                </div>
+                <div class="form-group">
+                    <label for="bookingDate">Data *</label>
+                    <input type="date" id="bookingDate" required onchange="updateAvailability()">
+                </div>
+                <div class="form-group">
+                    <label for="bookingTime">Orario *</label>
+                    <select id="bookingTime" required onchange="updateAvailability()">
+                        <option value="">Seleziona orario</option>
+                    </select>
+                </div>
+                <div class="form-group full-width">
+                    <div class="availability-indicator" id="availabilityIndicator"></div>
+                </div>
+            </form>
+            
+            <button class="book-btn" id="mainBookBtn" onclick="bookSelectedService()" style="display: none;">
+                <i class="fab fa-whatsapp"></i>
+                Prenota su WhatsApp
+            </button>
+        </section>
+        
+        <section class="nutritionist-section">
+            <h2 class="nutritionist-title">Consulenza Nutrizionale</h2>
+            <p class="nutritionist-description">
+                Ciao, sono <strong>Matteo Minerba</strong>, <strong>biologo nutrizionista</strong> in collaborazione con il <strong>Centro Estetico Chiara Beauty Boutique</strong> per offrire un approccio integrato alla cura della persona, che unisce <strong>un'alimentazione sana ed equilibrata con trattamenti estetici professionali</strong>.
+                Per i clienti del centro estetico sono previste <strong>offerte dedicate su percorsi nutrizionali personalizzati</strong>, studiati per <strong>potenziare i benefici dei trattamenti</strong> e supportare al meglio il raggiungimento dei risultati desiderati!<br>
+                Per informazioni, è possibile prenotare una consulenza nutrizionale.
+            </p>
+            <a href="https://wa.me/393665068384?text=Ciao! Sono interessato/a a prenotare una consulenza nutrizionale. Potresti fornirmi maggiori informazioni?" class="whatsapp-link" target="_blank">
+                <i class="fab fa-whatsapp"></i>
+                Prenota Consulenza Nutrizionale!
+            </a>
+        </section>
+        
+        <section class="opening-hours-section">
+            <h2 class="hours-title">I Nostri Orari</h2>
+            <div class="hours-content">
+                <p><strong>Martedì - Sabato</strong></p>
+                <p>09:30 - 13:30</p>
+                <p>16:00 - 20:00</p>
+                <hr>
+                <p><strong>Domenica & Lunedì</strong>: Chiuso</p>
+            </div>
+        </section>
+    </div>
+    
+    <!-- POPUP CONSULENZA NUTRIZIONALE -->
+    <div class="popup-overlay" id="nutritionistPopup">
+        <div class="popup-content">
+            <button class="popup-close" onclick="closeNutritionistPopup()">×</button>
+            <div class="popup-icon">🍎</div>
+            <h3 class="popup-title">Prenotazione confermata! Ora completa il tuo percorso di benessere!</h3>
+            <p class="popup-text">
+                Ciao, sono <strong>Matteo Minerba</strong>, <strong>sono un biologo nutrizionista</strong> e per rendere <strong>più efficaci e duraturi i trattamenti</strong>, ti invito ad intraprendere insieme una <strong>consulenza nutrizionale su misura per te</strong>.
+                <br><br>
+                <strong>Offerta speciale:</strong> Scopri come potenziare i benefici dei trattamenti estetici!
+            </p>
+            <div class="popup-buttons">
+                <a href="#" onclick="acceptNutritionistOffer(event)" class="popup-btn primary">
+                    <i class="fab fa-whatsapp"></i>
+                    Sì, voglio saperne di più!
+                </a>
+                <button onclick="declineNutritionistOffer()" class="popup-btn secondary">
+                    Magari più tardi...
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vercel Web Analytics per siti HTML statici -->
+    <script>
+        window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    </script>
+    <script defer src="/_vercel/insights/script.js"></script>
+
+    <script>
+        // ✅ CONFIGURAZIONE CORRETTA
+        const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzdYCjKXmPT4XwD3tIXZ7PaAsRsKxKVcJRU3GquO1auIXAx6LZZOCON0nDdAHUDt8_cYA/exec';
+        const WHATSAPP_NUMBER = '393513122638';
+
+        // Funzione helper per tracciare eventi personalizzati
+        function trackEvent(eventName, properties = {}) {
+            if (window.va) {
+                window.va('track', eventName, properties);
+            }
+            console.log('📊 Analytics Event:', eventName, properties);
+        }
+
+        // ✅ CONFIGURAZIONE SERVIZI CORRETTA (DEVE CORRISPONDERE AL BACKEND)
+        const services = [
+            {
+                id: 'antiage',
+                title: 'Trattamento Anti-Age Avanzato',
+                description: 'Trattamento rigenerante con tecnologie innovative per contrastare i segni del tempo. Combina radiofrequenza, ultrasuoni e sieri anti-age per un effetto lifting naturale.',
+                price: 89,
+                duration: 60,
+                maxBookingsPerSlot: 3
+            },
+            {
+                id: 'hydrafacial',
+                title: 'HydraFacial MD',
+                description: 'Il trattamento più rivoluzionario per la pulizia profonda del viso. Rimuove le impurità, esfolia delicatamente e idrata intensamente la pelle in un unico trattamento.',
+                price: 120,
+                duration: 45,
+                maxBookingsPerSlot: 2
+            },
+            {
+                id: 'microneedling',
+                title: 'Microneedling con Sieri Attivi',
+                description: 'Stimola il rinnovamento cellulare attraverso micro-perforazioni controllate. Ideale per cicatrici, rughe e texture della pelle. Include applicazione di sieri personalizzati.',
+                price: 95,
+                duration: 50,
+                maxBookingsPerSlot: 3
+            },
+            {
+                id: 'cryotherapy',
+                title: 'Crioterapia Localizzata',
+                description: 'Trattamento innovativo che utilizza il freddo controllato per tonificare, rassodare e rimodellare specifiche zone del corpo. Effetto immediato e duraturo.',
+                price: 75,
+                duration: 30,
+                maxBookingsPerSlot: 4
+            },
+            {
+                id: 'radiofrequenza',
+                title: 'Radiofrequenza Corpo',
+                description: 'Tecnologia avanzata per il rimodellamento corporeo e la riduzione della cellulite. Stimola la produzione di collagene per una pelle più tonica ed elastica.',
+                price: 80,
+                duration: 45,
+                maxBookingsPerSlot: 3
+            },
+            {
+                id: 'linfodrenaggio',
+                title: 'Linfodrenaggio Pressoterapia',
+                description: 'Massaggio meccanico che favorisce il drenaggio linfatico e la circolazione. Perfetto per ridurre gonfiori, ritenzione idrica e migliorare il tono della pelle.',
+                price: 60,
+                duration: 40,
+                maxBookingsPerSlot: 3
+            }
+        ];
+
+        // Cache e stato
+        let bookings = {};
+        let selectedService = null;
+        let lastCacheUpdate = null;
+        const CACHE_DURATION = 30000; // 30 secondi
+
+        // ✅ CARICA PRENOTAZIONI CORRETTE DA GOOGLE SHEETS
+        async function loadBookingsFromGoogle() {
+            try {
+                console.log('🔄 Caricamento prenotazioni da Google Sheets...');
+                
+                const url = `${GOOGLE_APPS_SCRIPT_URL}?action=getBookings&t=${Date.now()}`;
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    mode: 'cors', // ✅ Modalità CORS esplicita
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                console.log('📊 Risposta Google Sheets:', result);
+                
+                if (result.success) {
+                    bookings = result.data.bookings || {};
+                    lastCacheUpdate = Date.now();
+                    console.log('✅ Prenotazioni caricate:', Object.keys(bookings).length);
+                    return true;
+                } else {
+                    throw new Error(result.message || 'Errore sconosciuto');
+                }
+            } catch (error) {
+                console.error('❌ Errore caricamento da Google Sheets:', error);
+                
+                // Fallback: usa cache locale vuota
+                bookings = {};
+                lastCacheUpdate = Date.now();
+                return false;
+            }
+        }
+
+        // ✅ SALVA PRENOTAZIONE CORRETTA SU GOOGLE SHEETS
+        async function saveBookingToGoogle(bookingData) {
+            try {
+                console.log('💾 Salvataggio prenotazione su Google Sheets...', bookingData);
+                
+                const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(bookingData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                console.log('📊 Risultato salvataggio:', result);
+                
+                if (result.success) {
+                    console.log('✅ Prenotazione salvata:', result.data.bookingId);
+                    
+                    // Aggiorna cache locale
+                    const key = getBookingKey(bookingData.serviceId, bookingData.date, bookingData.time);
+                    bookings[key] = (bookings[key] || 0) + 1;
+                    
+                    return { success: true, bookingId: result.data.bookingId };
+                } else {
+                    throw new Error(result.message || 'Errore nel salvataggio');
+                }
+            } catch (error) {
+                console.error('❌ Errore salvataggio su Google Sheets:', error);
+                
+                // Genera ID temporaneo per continuare il flusso
+                const bookingId = 'TEMP-' + Date.now();
+                const key = getBookingKey(bookingData.serviceId, bookingData.date, bookingData.time);
+                bookings[key] = (bookings[key] || 0) + 1;
+                
+                return { success: true, bookingId: bookingId };
+            }
+        }
+
+        // ✅ VERIFICA DISPONIBILITÀ CORRETTA IN TEMPO REALE
+        async function checkAvailabilityOnline(serviceId, date, time) {
+            try {
+                const url = `${GOOGLE_APPS_SCRIPT_URL}?action=checkAvailability&serviceId=${serviceId}&date=${date}&time=${time}&t=${Date.now()}`;
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    console.log('✅ Verifica disponibilità online:', result.data);
+                    return result.data;
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                console.error('❌ Errore verifica disponibilità online:', error);
+                return null;
+            }
+        }
+
+        // Funzione per selezionare un servizio
+        function selectService(serviceId) {
+            // Rimuovi selezione precedente
+            document.querySelectorAll('.service-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            
+            // Seleziona nuovo servizio
+            const selectedCard = document.querySelector(`[data-service-id="${serviceId}"]`);
+            selectedCard.classList.add('selected');
+            
+            selectedService = services.find(s => s.id === serviceId);
+            
+            // 📊 TRACCIA SELEZIONE SERVIZIO
+            trackEvent('Service Selected', {
+                service_id: selectedService.id,
+                service_name: selectedService.title,
+                price: selectedService.price,
+                duration: selectedService.duration
+            });
+            
+            // Aggiorna UI
+            document.getElementById('selectedServiceName').textContent = selectedService.title;
+            document.getElementById('selectedServiceDetails').textContent = `€${selectedService.price} • ${selectedService.duration} minuti`;
+            
+            document.getElementById('selectedServiceInfo').classList.add('show');
+            document.getElementById('noServiceSelected').style.display = 'none';
+            document.getElementById('mainBookingForm').style.display = 'grid';
+            document.getElementById('mainBookBtn').style.display = 'flex';
+            
+            // Reset form e disponibilità
+            document.getElementById('mainBookingForm').reset();
+            document.getElementById('availabilityIndicator').textContent = '';
+            document.getElementById('availabilityIndicator').className = 'availability-indicator';
+        }
+
+        // Funzione per ottenere la chiave del booking
+        function getBookingKey(serviceId, date, time) {
+            return `${serviceId}_${date}_${time}`;
+        }
+
+        // ✅ FUNZIONE VERIFICA DISPONIBILITÀ CORRETTA
+        async function checkAvailability() {
+            if (!selectedService) return null;
+            
+            const dateInput = document.getElementById('bookingDate');
+            const timeInput = document.getElementById('bookingTime');
+            
+            if (!dateInput.value || !timeInput.value) return null;
+            
+            // Prima prova il controllo online
+            const onlineCheck = await checkAvailabilityOnline(selectedService.id, dateInput.value, timeInput.value);
+            if (onlineCheck) {
+                return onlineCheck;
+            }
+            
+            // Fallback: controllo locale
+            const key = getBookingKey(selectedService.id, dateInput.value, timeInput.value);
+            const currentBookings = bookings[key] || 0;
+            
+            if (currentBookings >= selectedService.maxBookingsPerSlot) {
+                return { status: 'unavailable', remaining: 0, available: false };
+            } else if (currentBookings >= selectedService.maxBookingsPerSlot - 1) {
+                return { status: 'limited', remaining: selectedService.maxBookingsPerSlot - currentBookings, available: true };
+            } else {
+                return { status: 'available', remaining: selectedService.maxBookingsPerSlot - currentBookings, available: true };
+            }
+        }
+
+        // Funzione per aggiornare l'indicatore di disponibilità
+        async function updateAvailability() {
+            const availabilityDiv = document.getElementById('availabilityIndicator');
+            const dateInput = document.getElementById('bookingDate');
+            
+            // Controllo giorni di chiusura (Domenica = 0, Lunedì = 1)
+            if (dateInput.value) {
+                const selectedDate = new Date(dateInput.value + 'T12:00:00');
+                const dayOfWeek = selectedDate.getDay();
+                
+                if (dayOfWeek === 0 || dayOfWeek === 1) {
+                    availabilityDiv.className = 'availability-indicator unavailable';
+                    availabilityDiv.textContent = '✗ Il centro è chiuso in questo giorno';
+                    alert('Il centro è chiuso di Domenica e Lunedì. Si prega di scegliere un altro giorno.');
+                    dateInput.value = '';
+                    return;
+                }
+            }
+            
+            // Mostra loading
+            availabilityDiv.className = 'availability-indicator';
+            availabilityDiv.textContent = '🔄 Controllo disponibilità in tempo reale...';
+            
+            const availability = await checkAvailability();
+            
+            if (availability) {
+                availabilityDiv.className = `availability-indicator ${availability.status}`;
+                
+                switch (availability.status) {
+                    case 'available':
+                        availabilityDiv.textContent = `✓ Disponibile (${availability.remaining} posti liberi)`;
+                        break;
+                    case 'limited':
+                        availabilityDiv.textContent = `⚠ Ultimi ${availability.remaining} posti disponibili`;
+                        break;
+                    case 'unavailable':
+                        availabilityDiv.textContent = '✗ Non disponibile per questo orario';
+                        break;
+                }
+            } else {
+                availabilityDiv.textContent = '';
+                availabilityDiv.className = 'availability-indicator';
+            }
+        }
+
+        // ✅ FUNZIONE PRENOTAZIONE CORRETTA
+        async function bookSelectedService() {
+            if (!selectedService) {
+                alert('Seleziona prima un trattamento.');
+                return;
+            }
+            
+            const nameInput = document.getElementById('customerName');
+            const phoneInput = document.getElementById('customerPhone');
+            const dateInput = document.getElementById('bookingDate');
+            const timeInput = document.getElementById('bookingTime');
+            
+            if (!dateInput.value || !timeInput.value || !nameInput.value || !phoneInput.value) {
+                alert('Per favore, compila tutti i campi per procedere con la prenotazione.');
+                return;
+            }
+            
+            // Mostra loading
+            const bookBtn = document.getElementById('mainBookBtn');
+            const originalText = bookBtn.innerHTML;
+            bookBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifica disponibilità...';
+            bookBtn.disabled = true;
+            
+            const availability = await checkAvailability();
+            
+            if (!availability || !availability.available) {
+                alert('Spiacenti, questo orario non è più disponibile. Seleziona un altro orario.');
+                bookBtn.innerHTML = originalText;
+                bookBtn.disabled = false;
+                return;
+            }
+            
+            // 📊 TRACCIA TENTATIVO DI PRENOTAZIONE
+            trackEvent('Booking Attempt', {
+                service_id: selectedService.id,
+                service_name: selectedService.title,
+                price: selectedService.price,
+                duration: selectedService.duration,
+                customer_name: nameInput.value,
+                booking_date: dateInput.value,
+                booking_time: timeInput.value,
+                availability_status: availability.status
+            });
+            
+            // ✅ SALVA LA PRENOTAZIONE CON PARAMETRI CORRETTI
+            bookBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvataggio prenotazione...';
+            
+            const bookingData = {
+                serviceId: selectedService.id,
+                serviceName: selectedService.title,
+                price: selectedService.price,
+                date: dateInput.value,
+                time: timeInput.value,
+                customerName: nameInput.value,
+                customerPhone: phoneInput.value,
+                timestamp: new Date().toISOString()
+            };
+            
+            const saveResult = await saveBookingToGoogle(bookingData);
+            
+            if (!saveResult.success) {
+                alert('Errore nel salvataggio della prenotazione. Riprova più tardi.');
+                bookBtn.innerHTML = originalText;
+                bookBtn.disabled = false;
+                return;
+            }
+            
+            // Formatta la data
+            const date = new Date(dateInput.value);
+            const formattedDate = date.toLocaleDateString('it-IT', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+            
+            // Crea il messaggio WhatsApp
+            const message = `🌸 *PRENOTAZIONE CHIARA BEAUTY BOUTIQUE* 🌸
+
+👤 *Nome:* ${nameInput.value}
+📱 *Telefono:* ${phoneInput.value}
+
+💆‍♀️ *Trattamento:* ${selectedService.title}
+📅 *Data:* ${formattedDate}
+🕐 *Orario:* ${timeInput.value}
+⏱ *Durata:* ${selectedService.duration} minuti
+💰 *Prezzo:* €${selectedService.price}
+
+📍 *Centro Estetico:* Via Roma 133, Nardò (Lecce)
+🆔 *Codice Prenotazione:* ${saveResult.bookingId}
+
+Confermo la mia prenotazione per il trattamento selezionato. Grazie! ✨`;
+            
+            // Apri WhatsApp con il messaggio
+            const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+            window.open(whatsappUrl, '_blank');
+            
+            // 📊 TRACCIA COMPLETAMENTO PRENOTAZIONE
+            trackEvent('Booking Completed', {
+                service_id: selectedService.id,
+                service_name: selectedService.title,
+                price: selectedService.price,
+                duration: selectedService.duration,
+                booking_date: formattedDate,
+                booking_time: timeInput.value,
+                revenue: selectedService.price,
+                booking_id: saveResult.bookingId
+            });
+            
+            // Reset UI
+            bookBtn.innerHTML = originalText;
+            bookBtn.disabled = false;
+            
+            // Mostra il popup per la consulenza nutrizionale dopo un breve ritardo
+            setTimeout(() => {
+                showNutritionistPopup();
+            }, 1500);
+            
+            // Aggiorna la disponibilità
+            updateAvailability();
+            
+            // Reset del form e selezione
+            document.getElementById('mainBookingForm').reset();
+            document.getElementById('selectedServiceInfo').classList.remove('show');
+            document.getElementById('noServiceSelected').style.display = 'block';
+            document.getElementById('mainBookingForm').style.display = 'none';
+            document.getElementById('mainBookBtn').style.display = 'none';
+            
+            // Rimuovi selezione servizio
+            document.querySelectorAll('.service-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            selectedService = null;
+        }
+
+        // FUNZIONI PER IL POPUP NUTRIZIONISTA
+        function showNutritionistPopup() {
+            document.getElementById('nutritionistPopup').classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeNutritionistPopup() {
+            document.getElementById('nutritionistPopup').classList.remove('show');
+            document.body.style.overflow = 'auto';
+        }
+
+        function acceptNutritionistOffer(event) {
+            event.preventDefault();
+            const name = document.getElementById('customerName').value || 'Cliente';
+
+            // 📊 TRACCIA INTERESSE CONSULENZA NUTRIZIONALE
+            trackEvent('Nutritionist Interest', {
+                customer_name: name,
+                source: 'post_booking_popup'
+            });
+
+            const message = `Ciao! Sono ${name}, ho appena prenotato un trattamento estetico presso Chiara Beauty Boutique e vorrei approfittare dell'offerta speciale sulla consulenza nutrizionale. Puoi fornirmi maggiori dettagli? Grazie!`;
+
+            const whatsappUrl = `https://wa.me/393665068384?text=${encodeURIComponent(message)}`;
+
+            window.open(whatsappUrl, '_blank');
+            closeNutritionistPopup();
+        }
+
+        function declineNutritionistOffer() {
+            // 📊 TRACCIA RIFIUTO CONSULENZA NUTRIZIONALE
+            trackEvent('Nutritionist Declined', {
+                source: 'post_booking_popup'
+            });
+            closeNutritionistPopup();
+        }
+
+        // ✅ ORARI DI APERTURA AGGIORNATI
+        function generateTimeSlots() {
+            const slots = [];
+            // Fascia Mattutina: 09:30 - 13:30
+            for (let h = 9; h <= 13; h++) {
+                for (let m = 0; m < 60; m += 30) {
+                    if (h === 9 && m < 30) continue;
+                    if (h === 13 && m > 30) continue;
+                    slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+                }
+            }
+            // Fascia Pomeridiana: 16:00 - 20:00
+            for (let h = 16; h <= 20; h++) {
+                for (let m = 0; m < 60; m += 30) {
+                    if (h === 20 && m > 0) continue;
+                     slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+                }
+            }
+            return slots;
+        }
+
+        function getMinDate() {
+            return new Date().toISOString().split('T')[0];
+        }
+
+        function generateServiceCards() {
+            const container = document.getElementById('servicesGrid');
+            services.forEach(service => {
+                const card = document.createElement('div');
+                card.className = 'service-card';
+                card.setAttribute('data-service-id', service.id);
+                card.onclick = () => selectService(service.id);
+                card.innerHTML = `<h3 class="service-title">${service.title}</h3><p class="service-description">${service.description}</p><div class="service-details"><span class="price">€${service.price}</span><span class="duration">${service.duration} minuti</span></div><div class="select-service-text">👆 Clicca per selezionare</div>`;
+                container.appendChild(card);
+            });
+        }
+
+        function populateTimeSlots() {
+            const timeSelect = document.getElementById('bookingTime');
+            // Svuota le opzioni esistenti prima di ripopolare
+            timeSelect.innerHTML = '<option value="">Seleziona orario</option>';
+            generateTimeSlots().forEach(time => {
+                const option = document.createElement('option');
+                option.value = time;
+                option.textContent = time;
+                timeSelect.appendChild(option);
+            });
+        }
+
+        // ✅ INIZIALIZZAZIONE CORRETTA DELLA PAGINA
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log('🚀 Inizializzazione pagina...');
+            
+            // Carica prenotazioni da Google Sheets
+            const loadSuccess = await loadBookingsFromGoogle();
+            console.log('📊 Caricamento prenotazioni:', loadSuccess ? 'SUCCESS' : 'FALLBACK');
+            
+            generateServiceCards();
+            populateTimeSlots();
+            document.getElementById('bookingDate').min = getMinDate();
+      
+            // 📊 TRACCIA VISITA PAGINA PRENOTAZIONI
+            trackEvent('Page View', {
+                page: 'booking',
+                timestamp: new Date().toISOString(),
+                existing_bookings: Object.keys(bookings).length,
+                google_sheets_connected: loadSuccess
+            });
+            
+            // ✅ TEST CONNESSIONE A GOOGLE SHEETS
+            try {
+                const testUrl = `${GOOGLE_APPS_SCRIPT_URL}?action=test&t=${Date.now()}`;
+                const testResponse = await fetch(testUrl);
+                const testResult = await testResponse.json();
+                
+                if (testResult.success) {
+                    console.log('✅ Test connessione Google Sheets:', testResult.data.message);
+                } else {
+                    console.warn('⚠️ Test connessione Google Sheets fallito:', testResult.message);
+                }
+            } catch (error) {
+                console.error('❌ Errore test connessione:', error);
+            }
+            
+            // 📊 TRACCIA CLICK SU LINK ESTERNI
+            document.addEventListener('click', function(e) {
+                const instagramLink = e.target.closest('a[href*="instagram.com"]');
+                if (instagramLink) {
+                    trackEvent('External Link Click', {
+                        link_type: 'instagram',
+                        url: instagramLink.href
+                    });
+                }
+                
+                const mapLink = e.target.closest('a[href*="maps.app.goo.gl"]');
+                if (mapLink) {
+                    trackEvent('External Link Click', {
+                        link_type: 'google_maps',
+                        url: mapLink.href
+                    });
+                }
+                
+                const nutritionistLink = e.target.closest('a[href*="wa.me/393665068384"]');
+                if (nutritionistLink) {
+                    trackEvent('Nutritionist Contact', {
+                        source: 'main_section',
+                        contact_method: 'whatsapp'
+                    });
+                }
+            });
+        });
+
+    </script>
+
+</body>
+</html><!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
@@ -574,659 +1278,3 @@
                 justify-content: center;
             }
         }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <header class="header">
-            <div class="logo">
-                <img src="https://i.imgur.com/8idnEmB.jpg" alt="Chiara Beauty Boutique Logo">
-            </div>
-            <h1>Chiara Beauty Boutique</h1>
-            <p class="subtitle">Centro di Estetica Avanzata</p>
-            <a href="https://maps.app.goo.gl/giW8pZUkchSUi1hj6" target="_blank" class="address">📍 Via Roma 133, Nardò (Lecce)</a>
-            <a href="https://www.instagram.com/chiara.beautyboutique?igsh=MXFieXZxamN6OXlsNQ==" target="_blank" class="instagram-link">
-                <i class="fab fa-instagram"></i>
-                @chiara.beautyboutique
-            </a>
-        </header>
-        
-        <div class="services-grid" id="servicesGrid">
-            <!-- I servizi verranno generati dinamicamente -->
-        </div>
-        
-        <section class="booking-section">
-            <h2 class="booking-title">Prenota il tuo Trattamento</h2>
-            
-            <div class="selected-service-info" id="selectedServiceInfo">
-                <div class="selected-service-name" id="selectedServiceName"></div>
-                <div class="selected-service-details" id="selectedServiceDetails"></div>
-            </div>
-            
-            <div class="no-service-selected" id="noServiceSelected">
-                <p>👆 Seleziona prima un trattamento dall'elenco qui sopra</p>
-            </div>
-            
-            <form class="booking-form" id="mainBookingForm" style="display: none;">
-                <div class="form-group">
-                    <label for="customerName">Nome *</label>
-                    <input type="text" id="customerName" required>
-                </div>
-                <div class="form-group">
-                    <label for="customerPhone">Telefono *</label>
-                    <input type="tel" id="customerPhone" required>
-                </div>
-                <div class="form-group">
-                    <label for="bookingDate">Data *</label>
-                    <input type="date" id="bookingDate" required onchange="updateAvailability()">
-                </div>
-                <div class="form-group">
-                    <label for="bookingTime">Orario *</label>
-                    <select id="bookingTime" required onchange="updateAvailability()">
-                        <option value="">Seleziona orario</option>
-                    </select>
-                </div>
-                <div class="form-group full-width">
-                    <div class="availability-indicator" id="availabilityIndicator"></div>
-                </div>
-            </form>
-            
-            <button class="book-btn" id="mainBookBtn" onclick="bookSelectedService()" style="display: none;">
-                <i class="fab fa-whatsapp"></i>
-                Prenota su WhatsApp
-            </button>
-        </section>
-        
-        <section class="nutritionist-section">
-            <h2 class="nutritionist-title">Consulenza Nutrizionale</h2>
-            <p class="nutritionist-description">
-                Ciao, sono <strong>Matteo Minerba</strong>, <strong>biologo nutrizionista</strong> in collaborazione con il <strong>Centro Estetico Chiara Beauty Boutique</strong> per offrire un approccio integrato alla cura della persona, che unisce <strong>un'alimentazione sana ed equilibrata con trattamenti estetici professionali</strong>.
-                Per i clienti del centro estetico sono previste <strong>offerte dedicate su percorsi nutrizionali personalizzati</strong>, studiati per <strong>potenziare i benefici dei trattamenti</strong> e supportare al meglio il raggiungimento dei risultati desiderati!<br>
-                Per informazioni, è possibile prenotare una consulenza nutrizionale.
-            </p>
-            <a href="https://wa.me/393665068384?text=Ciao! Sono interessato/a a prenotare una consulenza nutrizionale. Potresti fornirmi maggiori informazioni?" class="whatsapp-link" target="_blank">
-                <i class="fab fa-whatsapp"></i>
-                Prenota Consulenza Nutrizionale!
-            </a>
-        </section>
-        
-        <section class="opening-hours-section">
-            <h2 class="hours-title">I Nostri Orari</h2>
-            <div class="hours-content">
-                <p><strong>Martedì - Sabato</strong></p>
-                <p>09:30 - 13:30</p>
-                <p>16:00 - 20:00</p>
-                <hr>
-                <p><strong>Domenica & Lunedì</strong>: Chiuso</p>
-            </div>
-        </section>
-    </div>
-    
-    <!-- POPUP CONSULENZA NUTRIZIONALE -->
-    <div class="popup-overlay" id="nutritionistPopup">
-        <div class="popup-content">
-            <button class="popup-close" onclick="closeNutritionistPopup()">×</button>
-            <div class="popup-icon">🍎</div>
-            <h3 class="popup-title">Prenotazione confermata! Ora completa il tuo percorso di benessere!</h3>
-            <p class="popup-text">
-                Ciao, sono <strong>Matteo Minerba</strong>, <strong>sono un biologo nutrizionista</strong> e per rendere <strong>più efficaci e duraturi i trattamenti</strong>, ti invito ad intraprendere insieme una <strong>consulenza nutrizionale su misura per te</strong>.
-                <br><br>
-                <strong>Offerta speciale:</strong> Scopri come potenziare i benefici dei trattamenti estetici!
-            </p>
-            <div class="popup-buttons">
-                <a href="#" onclick="acceptNutritionistOffer(event)" class="popup-btn primary">
-                    <i class="fab fa-whatsapp"></i>
-                    Sì, voglio saperne di più!
-                </a>
-                <button onclick="declineNutritionistOffer()" class="popup-btn secondary">
-                    Magari più tardi...
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Vercel Web Analytics per siti HTML statici -->
-    <script>
-        window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
-    </script>
-    <script defer src="/_vercel/insights/script.js"></script>
-
-    <script>
-        // Funzione helper per tracciare eventi personalizzati
-        function trackEvent(eventName, properties = {}) {
-            if (window.va) {
-                window.va('track', eventName, properties);
-            }
-            // Backup: log in console per debug
-            console.log('📊 Analytics Event:', eventName, properties);
-        }
-
-        // Configurazione servizi
-        const services = [
-            {
-                id: 'antiage',
-                title: 'Trattamento Anti-Age Avanzato',
-                description: 'Trattamento rigenerante con tecnologie innovative per contrastare i segni del tempo. Combina radiofrequenza, ultrasuoni e sieri anti-age per un effetto lifting naturale.',
-                price: 89,
-                duration: 60,
-                maxBookingsPerSlot: 3
-            },
-            {
-                id: 'hydrafacial',
-                title: 'HydraFacial MD',
-                description: 'Il trattamento più rivoluzionario per la pulizia profonda del viso. Rimuove le impurità, esfolia delicatamente e idrata intensamente la pelle in un unico trattamento.',
-                price: 120,
-                duration: 45,
-                maxBookingsPerSlot: 2
-            },
-            {
-                id: 'microneedling',
-                title: 'Microneedling con Sieri Attivi',
-                description: 'Stimola il rinnovamento cellulare attraverso micro-perforazioni controllate. Ideale per cicatrici, rughe e texture della pelle. Include applicazione di sieri personalizzati.',
-                price: 95,
-                duration: 50,
-                maxBookingsPerSlot: 3
-            },
-            {
-                id: 'cryotherapy',
-                title: 'Crioterapia Localizzata',
-                description: 'Trattamento innovativo che utilizza il freddo controllato per tonificare, rassodare e rimodellare specifiche zone del corpo. Effetto immediato e duraturo.',
-                price: 75,
-                duration: 30,
-                maxBookingsPerSlot: 4
-            },
-            {
-                id: 'radiofrequenza',
-                title: 'Radiofrequenza Corpo',
-                description: 'Tecnologia avanzata per il rimodellamento corporeo e la riduzione della cellulite. Stimola la produzione di collagene per una pelle più tonica ed elastica.',
-                price: 80,
-                duration: 45,
-                maxBookingsPerSlot: 3
-            },
-            {
-                id: 'linfodrenaggio',
-                title: 'Linfodrenaggio Pressoterapia',
-                description: 'Massaggio meccanico che favorisce il drenaggio linfatico e la circolazione. Perfetto per ridurre gonfiori, ritenzione idrica e migliorare il tono della pelle.',
-                price: 60,
-                duration: 40,
-                maxBookingsPerSlot: 3
-            }
-        ];
-
-        // Numero WhatsApp del centro
-        const WHATSAPP_NUMBER = '393513122638';
-
-        // CONFIGURAZIONE GOOGLE APPS SCRIPT
-        const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzdYCjKXmPT4XwD3tIXZ7PaAsRsKxKVcJRU3GquO1auIXAx6LZZOCON0nDdAHUDt8_cYA/exec';
-
-        // Cache e stato
-        let bookings = {};
-        let selectedService = null;
-        let lastCacheUpdate = null;
-        const CACHE_DURATION = 30000; // 30 secondi
-
-        // Carica prenotazioni da Google Sheets
-        async function loadBookingsFromGoogle() {
-            try {
-                console.log('🔄 Caricamento prenotazioni da Google Sheets...');
-                
-                const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?action=getBookings`);
-                const result = await response.json();
-                
-                if (result.success) {
-                    bookings = result.data.bookings || {};
-                    lastCacheUpdate = Date.now();
-                    console.log('✅ Prenotazioni caricate da Google Sheets:', Object.keys(bookings).length);
-                    return true;
-                } else {
-                    throw new Error(result.message);
-                }
-            } catch (error) {
-                console.error('❌ Errore caricamento da Google Sheets:', error);
-                
-                // Fallback: carica da variabile
-                console.log('📦 Fallback: utilizzo dati locali');
-                bookings = {};
-                return false;
-            }
-        }
-
-        // Salva prenotazione su Google Sheets
-        async function saveBookingToGoogle(bookingData) {
-            try {
-                console.log('💾 Salvataggio prenotazione su Google Sheets...');
-                
-                const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(bookingData)
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    console.log('✅ Prenotazione salvata:', result.data.bookingId);
-                    
-                    // Aggiorna cache locale
-                    const key = getBookingKey(bookingData.serviceId, bookingData.date, bookingData.time);
-                    bookings[key] = (bookings[key] || 0) + 1;
-                    
-                    return { success: true, bookingId: result.data.bookingId };
-                } else {
-                    throw new Error(result.message);
-                }
-            } catch (error) {
-                console.error('❌ Errore salvataggio su Google Sheets:', error);
-                
-                // Genera ID fittizio per continuare il flusso
-                const bookingId = 'TEMP-' + Date.now();
-                const key = getBookingKey(bookingData.serviceId, bookingData.date, bookingData.time);
-                bookings[key] = (bookings[key] || 0) + 1;
-                
-                return { success: true, bookingId: bookingId };
-            }
-        }
-
-        // Verifica disponibilità in tempo reale da Google Sheets
-        async function checkAvailabilityOnline(serviceId, date, time) {
-            try {
-                const url = `${GOOGLE_APPS_SCRIPT_URL}?action=checkAvailability&serviceId=${serviceId}&date=${date}&time=${time}`;
-                const response = await fetch(url);
-                const result = await response.json();
-                
-                if (result.success) {
-                    return result.data;
-                } else {
-                    throw new Error(result.message);
-                }
-            } catch (error) {
-                console.error('❌ Errore verifica disponibilità online:', error);
-                return null;
-            }
-        }
-
-        // Funzione per selezionare un servizio
-        function selectService(serviceId) {
-            // Rimuovi selezione precedente
-            document.querySelectorAll('.service-card').forEach(card => {
-                card.classList.remove('selected');
-            });
-            
-            // Seleziona nuovo servizio
-            const selectedCard = document.querySelector(`[data-service-id="${serviceId}"]`);
-            selectedCard.classList.add('selected');
-            
-            selectedService = services.find(s => s.id === serviceId);
-            
-            // 📊 TRACCIA SELEZIONE SERVIZIO
-            trackEvent('Service Selected', {
-                service_id: selectedService.id,
-                service_name: selectedService.title,
-                price: selectedService.price,
-                duration: selectedService.duration
-            });
-            
-            // Aggiorna UI
-            document.getElementById('selectedServiceName').textContent = selectedService.title;
-            document.getElementById('selectedServiceDetails').textContent = `€${selectedService.price} • ${selectedService.duration} minuti`;
-            
-            document.getElementById('selectedServiceInfo').classList.add('show');
-            document.getElementById('noServiceSelected').style.display = 'none';
-            document.getElementById('mainBookingForm').style.display = 'grid';
-            document.getElementById('mainBookBtn').style.display = 'flex';
-            
-            // Reset form e disponibilità
-            document.getElementById('mainBookingForm').reset();
-            document.getElementById('availabilityIndicator').textContent = '';
-            document.getElementById('availabilityIndicator').className = 'availability-indicator';
-        }
-
-        // Funzione per ottenere la chiave del booking
-        function getBookingKey(serviceId, date, time) {
-            return `${serviceId}_${date}_${time}`;
-        }
-
-        // Funzione per verificare la disponibilità
-        async function checkAvailability() {
-            if (!selectedService) return null;
-            
-            const dateInput = document.getElementById('bookingDate');
-            const timeInput = document.getElementById('bookingTime');
-            
-            if (!dateInput.value || !timeInput.value) return null;
-            
-            // Prima prova il controllo online
-            const onlineCheck = await checkAvailabilityOnline(selectedService.id, dateInput.value, timeInput.value);
-            if (onlineCheck) {
-                return onlineCheck;
-            }
-            
-            // Fallback: controllo locale
-            const key = getBookingKey(selectedService.id, dateInput.value, timeInput.value);
-            const currentBookings = bookings[key] || 0;
-            
-            if (currentBookings >= selectedService.maxBookingsPerSlot) {
-                return { status: 'unavailable', remaining: 0, available: false };
-            } else if (currentBookings >= selectedService.maxBookingsPerSlot - 1) {
-                return { status: 'limited', remaining: selectedService.maxBookingsPerSlot - currentBookings, available: true };
-            } else {
-                return { status: 'available', remaining: selectedService.maxBookingsPerSlot - currentBookings, available: true };
-            }
-        }
-
-        // Funzione per aggiornare l'indicatore di disponibilità
-        async function updateAvailability() {
-            const availabilityDiv = document.getElementById('availabilityIndicator');
-            const dateInput = document.getElementById('bookingDate');
-            
-            // Controllo giorni di chiusura (Domenica = 0, Lunedì = 1)
-            if (dateInput.value) {
-                const selectedDate = new Date(dateInput.value + 'T12:00:00');
-                const dayOfWeek = selectedDate.getDay();
-                
-                if (dayOfWeek === 0 || dayOfWeek === 1) {
-                    availabilityDiv.className = 'availability-indicator unavailable';
-                    availabilityDiv.textContent = '✗ Il centro è chiuso in questo giorno';
-                    alert('Il centro è chiuso di Domenica e Lunedì. Si prega di scegliere un altro giorno.');
-                    dateInput.value = '';
-                    return;
-                }
-            }
-            
-            // Mostra loading
-            availabilityDiv.className = 'availability-indicator';
-            availabilityDiv.textContent = '🔄 Controllo disponibilità in tempo reale...';
-            
-            const availability = await checkAvailability();
-            
-            if (availability) {
-                availabilityDiv.className = `availability-indicator ${availability.status}`;
-                
-                switch (availability.status) {
-                    case 'available':
-                        availabilityDiv.textContent = `✓ Disponibile (${availability.remaining} posti liberi)`;
-                        break;
-                    case 'limited':
-                        availabilityDiv.textContent = `⚠ Ultimi ${availability.remaining} posti disponibili`;
-                        break;
-                    case 'unavailable':
-                        availabilityDiv.textContent = '✗ Non disponibile per questo orario';
-                        break;
-                }
-            } else {
-                availabilityDiv.textContent = '';
-                availabilityDiv.className = 'availability-indicator';
-            }
-        }
-
-        // Funzione per effettuare la prenotazione
-        async function bookSelectedService() {
-            if (!selectedService) {
-                alert('Seleziona prima un trattamento.');
-                return;
-            }
-            
-            const nameInput = document.getElementById('customerName');
-            const phoneInput = document.getElementById('customerPhone');
-            const dateInput = document.getElementById('bookingDate');
-            const timeInput = document.getElementById('bookingTime');
-            
-            if (!dateInput.value || !timeInput.value || !nameInput.value || !phoneInput.value) {
-                alert('Per favore, compila tutti i campi per procedere con la prenotazione.');
-                return;
-            }
-            
-            // Mostra loading
-            const bookBtn = document.getElementById('mainBookBtn');
-            const originalText = bookBtn.innerHTML;
-            bookBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifica disponibilità...';
-            bookBtn.disabled = true;
-            
-            const availability = await checkAvailability();
-            
-            if (!availability || !availability.available) {
-                alert('Spiacenti, questo orario non è più disponibile. Seleziona un altro orario.');
-                bookBtn.innerHTML = originalText;
-                bookBtn.disabled = false;
-                return;
-            }
-            
-            // 📊 TRACCIA TENTATIVO DI PRENOTAZIONE
-            trackEvent('Booking Attempt', {
-                service_id: selectedService.id,
-                service_name: selectedService.title,
-                price: selectedService.price,
-                duration: selectedService.duration,
-                customer_name: nameInput.value,
-                booking_date: dateInput.value,
-                booking_time: timeInput.value,
-                availability_status: availability.status
-            });
-            
-            // Salva la prenotazione su Google Sheets
-            bookBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvataggio prenotazione...';
-            
-            const bookingData = {
-                serviceId: selectedService.id,
-                serviceName: selectedService.title,
-                price: selectedService.price,
-                date: dateInput.value,
-                time: timeInput.value,
-                customerName: nameInput.value,
-                customerPhone: phoneInput.value,
-                timestamp: new Date().toISOString()
-            };
-            
-            const saveResult = await saveBookingToGoogle(bookingData);
-            
-            if (!saveResult.success) {
-                alert('Errore nel salvataggio della prenotazione. Riprova più tardi.');
-                bookBtn.innerHTML = originalText;
-                bookBtn.disabled = false;
-                return;
-            }
-            
-            // Formatta la data
-            const date = new Date(dateInput.value);
-            const formattedDate = date.toLocaleDateString('it-IT', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-            });
-            
-            // Crea il messaggio WhatsApp
-            const message = `🌸 *PRENOTAZIONE CHIARA BEAUTY BOUTIQUE* 🌸
-
-👤 *Nome:* ${nameInput.value}
-📱 *Telefono:* ${phoneInput.value}
-
-💆‍♀️ *Trattamento:* ${selectedService.title}
-📅 *Data:* ${formattedDate}
-🕐 *Orario:* ${timeInput.value}
-⏱ *Durata:* ${selectedService.duration} minuti
-💰 *Prezzo:* €${selectedService.price}
-
-📍 *Centro Estetico:* Via Roma 133, Nardò (Lecce)
-🆔 *Codice Prenotazione:* ${saveResult.bookingId}
-
-Confermo la mia prenotazione per il trattamento selezionato. Grazie! ✨`;
-            
-            // Apri WhatsApp con il messaggio
-            const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
-            window.open(whatsappUrl, '_blank');
-            
-            // 📊 TRACCIA COMPLETAMENTO PRENOTAZIONE
-            trackEvent('Booking Completed', {
-                service_id: selectedService.id,
-                service_name: selectedService.title,
-                price: selectedService.price,
-                duration: selectedService.duration,
-                booking_date: formattedDate,
-                booking_time: timeInput.value,
-                revenue: selectedService.price,
-                booking_id: saveResult.bookingId
-            });
-            
-            // Reset UI
-            bookBtn.innerHTML = originalText;
-            bookBtn.disabled = false;
-            
-            // Mostra il popup per la consulenza nutrizionale dopo un breve ritardo
-            setTimeout(() => {
-                showNutritionistPopup();
-            }, 1500);
-            
-            // Aggiorna la disponibilità
-            updateAvailability();
-            
-            // Reset del form e selezione
-            document.getElementById('mainBookingForm').reset();
-            document.getElementById('selectedServiceInfo').classList.remove('show');
-            document.getElementById('noServiceSelected').style.display = 'block';
-            document.getElementById('mainBookingForm').style.display = 'none';
-            document.getElementById('mainBookBtn').style.display = 'none';
-            
-            // Rimuovi selezione servizio
-            document.querySelectorAll('.service-card').forEach(card => {
-                card.classList.remove('selected');
-            });
-            selectedService = null;
-        }
-
-        // FUNZIONI PER IL POPUP NUTRIZIONISTA
-        function showNutritionistPopup() {
-            document.getElementById('nutritionistPopup').classList.add('show');
-            document.body.style.overflow = 'hidden';
-        }
-
-        function closeNutritionistPopup() {
-            document.getElementById('nutritionistPopup').classList.remove('show');
-            document.body.style.overflow = 'auto';
-        }
-
-        function acceptNutritionistOffer(event) {
-            event.preventDefault();
-            const name = document.getElementById('customerName').value || 'Cliente';
-
-            // 📊 TRACCIA INTERESSE CONSULENZA NUTRIZIONALE
-            trackEvent('Nutritionist Interest', {
-                customer_name: name,
-                source: 'post_booking_popup'
-            });
-
-            const message = `Ciao! Sono ${name}, ho appena prenotato un trattamento estetico presso Chiara Beauty Boutique e vorrei approfittare dell'offerta speciale sulla consulenza nutrizionale. Puoi fornirmi maggiori dettagli? Grazie!`;
-
-            const whatsappUrl = `https://wa.me/393665068384?text=${encodeURIComponent(message)}`;
-
-            window.open(whatsappUrl, '_blank');
-            closeNutritionistPopup();
-        }
-
-        function declineNutritionistOffer() {
-            // 📊 TRACCIA RIFIUTO CONSULENZA NUTRIZIONALE
-            trackEvent('Nutritionist Declined', {
-                source: 'post_booking_popup'
-            });
-            closeNutritionistPopup();
-        }
-
-        // Orari di apertura aggiornati
-        function generateTimeSlots() {
-            const slots = [];
-            // Fascia Mattutina: 09:30 - 13:30
-            for (let h = 9; h <= 13; h++) {
-                for (let m = 0; m < 60; m += 30) {
-                    if (h === 9 && m < 30) continue;
-                    if (h === 13 && m > 30) continue;
-                    slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
-                }
-            }
-            // Fascia Pomeridiana: 16:00 - 20:00
-            for (let h = 16; h <= 20; h++) {
-                for (let m = 0; m < 60; m += 30) {
-                    if (h === 20 && m > 0) continue;
-                     slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
-                }
-            }
-            return slots;
-        }
-
-        function getMinDate() {
-            return new Date().toISOString().split('T')[0];
-        }
-
-        function generateServiceCards() {
-            const container = document.getElementById('servicesGrid');
-            services.forEach(service => {
-                const card = document.createElement('div');
-                card.className = 'service-card';
-                card.setAttribute('data-service-id', service.id);
-                card.onclick = () => selectService(service.id);
-                card.innerHTML = `<h3 class="service-title">${service.title}</h3><p class="service-description">${service.description}</p><div class="service-details"><span class="price">€${service.price}</span><span class="duration">${service.duration} minuti</span></div><div class="select-service-text">👆 Clicca per selezionare</div>`;
-                container.appendChild(card);
-            });
-        }
-
-        function populateTimeSlots() {
-            const timeSelect = document.getElementById('bookingTime');
-            // Svuota le opzioni esistenti prima di ripopolare
-            timeSelect.innerHTML = '<option value="">Seleziona orario</option>';
-            generateTimeSlots().forEach(time => {
-                const option = document.createElement('option');
-                option.value = time;
-                option.textContent = time;
-                timeSelect.appendChild(option);
-            });
-        }
-
-        // Inizializzazione della pagina
-        document.addEventListener('DOMContentLoaded', async function() {
-            // Carica prenotazioni da Google Sheets
-            await loadBookingsFromGoogle();
-            
-            generateServiceCards();
-            populateTimeSlots();
-            document.getElementById('bookingDate').min = getMinDate();
-      
-            // 📊 TRACCIA VISITA PAGINA PRENOTAZIONI
-            trackEvent('Page View', {
-                page: 'booking',
-                timestamp: new Date().toISOString(),
-                existing_bookings: Object.keys(bookings).length
-            });
-            
-            // 📊 TRACCIA CLICK SU LINK ESTERNI
-            document.addEventListener('click', function(e) {
-                const instagramLink = e.target.closest('a[href*="instagram.com"]');
-                if (instagramLink) {
-                    trackEvent('External Link Click', {
-                        link_type: 'instagram',
-                        url: instagramLink.href
-                    });
-                }
-                
-                const mapLink = e.target.closest('a[href*="maps.app.goo.gl"]');
-                if (mapLink) {
-                    trackEvent('External Link Click', {
-                        link_type: 'google_maps',
-                        url: mapLink.href
-                    });
-                }
-                
-                const nutritionistLink = e.target.closest('a[href*="wa.me/393665068384"]');
-                if (nutritionistLink) {
-                    trackEvent('Nutritionist Contact', {
-                        source: 'main_section',
-                        contact_method: 'whatsapp'
-                    });
-                }
-            });
-        });
-
-    </script>
-
-</body>
-</html>
