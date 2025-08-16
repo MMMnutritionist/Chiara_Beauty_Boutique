@@ -1,107 +1,74 @@
-// ==========================
-// 📄 Booking Google Apps Script
-// ==========================
+// /api/bookings.js - VERSIONE MOCK TEMPORANEA
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-// Costante: nome del foglio dove salvare le prenotazioni
-const SHEET_NAME = "Prenotazioni";
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
-// ==========================
-// 📥 DO GET - Lettura prenotazioni / verifica disponibilità
-// ==========================
-function doGet(e) {
   try {
-    const action = e.parameter.action;
+    console.log('🧪 MOCK API - Method:', req.method);
+    console.log('🧪 MOCK API - URL:', req.url);
 
-    if (action === "getBookings") {
-      const bookings = getBookingsFromSheet();
-      return jsonResponse({ success: true, data: { bookings } });
+    if (req.method === 'GET') {
+      const url = new URL(req.url, `https://${req.headers.host}`);
+      const action = url.searchParams.get('action');
+      
+      if (action === 'getBookings') {
+        // Mock data - prenotazioni simulate
+        const mockBookings = {
+          'hydrafacial_2025-08-17_10:00': 1,
+          'facial_2025-08-17_14:00': 1
+        };
+        
+        return res.status(200).json({
+          success: true,
+          data: { bookings: mockBookings }
+        });
+      }
+      
+      if (action === 'checkAvailability') {
+        const serviceId = url.searchParams.get('serviceId');
+        const date = url.searchParams.get('date');
+        const time = url.searchParams.get('time');
+        
+        // Mock availability - sempre disponibile tranne alcuni slot
+        const unavailableSlots = ['hydrafacial_2025-08-17_10:00'];
+        const key = `${serviceId}_${date}_${time}`;
+        const available = !unavailableSlots.includes(key);
+        
+        return res.status(200).json({
+          success: true,
+          data: { available }
+        });
+      }
     }
 
-    if (action === "checkAvailability") {
-      const serviceId = e.parameter.serviceId;
-      const date = e.parameter.date;
-      const time = e.parameter.time;
-      const available = checkAvailability(serviceId, date, time);
-      return jsonResponse({ success: true, data: { available } });
+    if (req.method === 'POST') {
+      const booking = req.body;
+      const mockBookingId = 'MOCK-BKG-' + Date.now();
+      
+      console.log('🧪 MOCK BOOKING SAVED:', booking);
+      
+      return res.status(200).json({
+        success: true,
+        data: { bookingId: mockBookingId }
+      });
     }
 
-    throw new Error("Azione non valida");
-  } catch (err) {
-    return jsonResponse({ success: false, message: err.message });
+    return res.status(400).json({
+      success: false,
+      error: 'Azione non valida'
+    });
+
+  } catch (error) {
+    console.error('❌ MOCK API Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: error.message
+    });
   }
-}
-
-// ==========================
-// 📤 DO POST - Salvataggio prenotazione
-// ==========================
-function doPost(e) {
-  try {
-    const data = JSON.parse(e.postData.contents);
-    const bookingId = saveBookingToSheet(data);
-    return jsonResponse({ success: true, data: { bookingId } });
-  } catch (err) {
-    return jsonResponse({ success: false, message: err.message });
-  }
-}
-
-// ==========================
-// 🔑 Funzioni helper
-// ==========================
-function jsonResponse(obj) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-// Legge tutte le prenotazioni dal foglio
-function getBookingsFromSheet() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-  if (!sheet) return {};
-
-  const data = sheet.getDataRange().getValues();
-  const headers = data.shift(); // prima riga = intestazioni
-
-  const bookings = {};
-  data.forEach(row => {
-    const rowObj = {};
-    headers.forEach((h, i) => rowObj[h] = row[i]);
-    const key = `${rowObj.serviceId}_${rowObj.date}_${rowObj.time}`;
-    bookings[key] = (bookings[key] || 0) + 1;
-  });
-  return bookings;
-}
-
-// Salva una prenotazione nel foglio e restituisce un ID univoco
-function saveBookingToSheet(booking) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-  if (!sheet) throw new Error("Foglio prenotazioni non trovato");
-
-  const bookingId = 'BKG-' + Date.now();
-  const row = [
-    bookingId,
-    booking.serviceId,
-    booking.date,
-    booking.time,
-    booking.name || "",
-    booking.email || "",
-    booking.phone || "",
-    booking.note || ""
-  ];
-  
-  // Se il foglio è vuoto, scrivi intestazioni
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(['bookingId','serviceId','date','time','name','email','phone','note']);
-  }
-
-  sheet.appendRow(row);
-  return bookingId;
-}
-
-// Controlla se un orario è disponibile
-function checkAvailability(serviceId, date, time) {
-  const bookings = getBookingsFromSheet();
-  const key = `${serviceId}_${date}_${time}`;
-  // Qui puoi settare max prenotazioni per slot, esempio 1
-  const MAX_PER_SLOT = 1;
-  return (bookings[key] || 0) < MAX_PER_SLOT;
 }
