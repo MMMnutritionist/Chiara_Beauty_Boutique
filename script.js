@@ -1,19 +1,15 @@
-// ✅ Tutte le richieste vanno ora al proxy su Vercel
+// ==========================
+// ✅ CONFIG
+// ==========================
 const GOOGLE_APPS_SCRIPT_URL = '/api/bookings';
 
-let bookings = {};
-let lastCacheUpdate = null;
-const CACHE_TTL = 5 * 60 * 1000; // 5 minuti di validità cache
+let bookings = {};            // Cache locale
+let lastCacheUpdate = null;   // Timestamp ultimo aggiornamento
 
 // ==========================
-// 🔄 CARICAMENTO PRENOTAZIONI
+// 🔄 CARICAMENTO PRENOTAZIONI DAL PROXY
 // ==========================
-async function loadBookingsFromGoogle(force = false) {
-    if (!force && lastCacheUpdate && Date.now() - lastCacheUpdate < CACHE_TTL) {
-        console.log('⏱️ Cache ancora valida, niente fetch');
-        return true;
-    }
-
+async function loadBookingsFromGoogle() {
     try {
         console.log('🔄 Caricamento prenotazioni dal proxy Vercel...');
         const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?action=getBookings`);
@@ -25,7 +21,7 @@ async function loadBookingsFromGoogle(force = false) {
             console.log('✅ Prenotazioni caricate:', Object.keys(bookings).length);
             return true;
         } else {
-            throw new Error(result.message || 'Errore sconosciuto dal server');
+            throw new Error(result.message || 'Errore sconosciuto durante il caricamento.');
         }
     } catch (error) {
         console.error('❌ Errore caricamento dal proxy:', error);
@@ -35,11 +31,9 @@ async function loadBookingsFromGoogle(force = false) {
 }
 
 // ==========================
-// 💾 SALVATAGGIO PRENOTAZIONE
+// 💾 SALVATAGGIO PRENOTAZIONE TRAMITE PROXY
 // ==========================
 async function saveBookingToGoogle(bookingData) {
-    const key = getBookingKey(bookingData.serviceId, bookingData.date, bookingData.time);
-    
     try {
         console.log('💾 Salvataggio prenotazione tramite proxy Vercel...');
         const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
@@ -52,59 +46,57 @@ async function saveBookingToGoogle(bookingData) {
 
         if (result.success) {
             console.log('✅ Prenotazione salvata:', result.data.bookingId);
+
+            // Aggiorna cache locale
+            const key = getBookingKey(bookingData.serviceId, bookingData.date, bookingData.time);
             bookings[key] = (bookings[key] || 0) + 1;
+
             return { success: true, bookingId: result.data.bookingId };
         } else {
-            throw new Error(result.message || 'Errore sconosciuto dal server');
+            throw new Error(result.message || 'Errore sconosciuto durante il salvataggio.');
         }
     } catch (error) {
-        console.error('❌ Errore salvataggio tramite proxy, fallback locale:', error);
-        
-        // Fallback locale senza bloccare l'utente
+        console.error('❌ Errore salvataggio tramite proxy:', error);
+
+        // Fallback: ID temporaneo e aggiornamento cache locale
         const bookingId = 'TEMP-' + Date.now();
+        const key = getBookingKey(bookingData.serviceId, bookingData.date, bookingData.time);
         bookings[key] = (bookings[key] || 0) + 1;
+
         return { success: true, bookingId };
     }
 }
 
 // ==========================
-// 📅 VERIFICA DISPONIBILITÀ
+// 📅 VERIFICA DISPONIBILITÀ ONLINE
 // ==========================
 async function checkAvailabilityOnline(serviceId, date, time) {
-    const key = getBookingKey(serviceId, date, time);
-
     try {
         const url = `${GOOGLE_APPS_SCRIPT_URL}?action=checkAvailability&serviceId=${serviceId}&date=${date}&time=${time}`;
         const response = await fetch(url);
         const result = await response.json();
 
         if (result.success) {
-            // Aggiorno cache locale con il numero di prenotazioni
-            bookings[key] = result.data.booked || 0;
-            return result.data.available;
+            return result.data; // { booked: number }
         } else {
-            throw new Error(result.message || 'Errore sconosciuto dal server');
+            throw new Error(result.message || 'Errore verifica disponibilità.');
         }
     } catch (error) {
         console.error('❌ Errore verifica disponibilità tramite proxy:', error);
-
-        // Fallback: stimo disponibilità da cache locale
-        const booked = bookings[key] || 0;
-        return booked < (result?.data?.capacity || 10); // default capacity 10
+        return null;
     }
 }
 
 // ==========================
-// 🔑 GENERATORE DI CHIAVI
+// 🔑 GENERATORE DI CHIAVI PER CACHE
 // ==========================
 function getBookingKey(serviceId, date, time) {
     return `${serviceId}_${date}_${time}`;
 }
 
 // ==========================
-// 🚀 AVVIO INIZIALE
+// 🚀 AVVIO INIZIALE AL CARICAMENTO PAGINA
 // ==========================
 document.addEventListener('DOMContentLoaded', () => {
     loadBookingsFromGoogle();
 });
-
