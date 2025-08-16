@@ -1,102 +1,120 @@
-// ==========================
-// ✅ CONFIG
-// ==========================
-const GOOGLE_APPS_SCRIPT_URL = '/api/bookings';
+// /api/bookings.js
+export default async function handler(req, res) {
+  // ✅ CORS headers per evitare problemi di cross-origin
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-let bookings = {};            // Cache locale
-let lastCacheUpdate = null;   // Timestamp ultimo aggiornamento
+  // ✅ Gestione preflight OPTIONS
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
-// ==========================
-// 🔄 CARICAMENTO PRENOTAZIONI DAL PROXY
-// ==========================
-async function loadBookingsFromGoogle() {
-    try {
-        console.log('🔄 Caricamento prenotazioni dal proxy Vercel...');
-        const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?action=getBookings`);
-        const result = await response.json();
+  try {
+    const baseUrl = 'https://script.google.com/macros/s/AKfycbwEcn-7d0Z8zCeUfb-ppyWOp6-oQ0-L4C7jOPIPWDCrQFDgIuLO9ysv6Yf9gpl2had7SQ/exec';
+    const query = req.url.split('?')[1] || '';
+    const scriptUrl = `${baseUrl}${query ? '?' + query : ''}`;
+    
+    console.log('📡 Request method:', req.method);
+    console.log('📡 Request URL:', req.url);
 
-        if (result.success) {
-            bookings = result.data.bookings || {};
-            lastCacheUpdate = Date.now();
-            console.log('✅ Prenotazioni caricate:', Object.keys(bookings).length);
-            return true;
-        } else {
-            throw new Error(result.message || 'Errore sconosciuto durante il caricamento.');
-        }
-    } catch (error) {
-        console.error('❌ Errore caricamento dal proxy:', error);
-        bookings = {};
-        return false;
-    }
-}
-
-// ==========================
-// 💾 SALVATAGGIO PRENOTAZIONE TRAMITE PROXY
-// ==========================
-async function saveBookingToGoogle(bookingData) {
-    try {
-        console.log('💾 Salvataggio prenotazione tramite proxy Vercel...');
-        const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(bookingData)
+    if (req.method === 'POST') {
+      const body = await new Promise((resolve) => {
+        let data = '';
+        req.on('data', chunk => { data += chunk; });
+        req.on('end', () => resolve(data));
+      });
+      // ✅ Gestione corretta del body per POST
+      let body;
+      
+      if (typeof req.body === 'string') {
+        body = req.body;
+      } else if (req.body && typeof req.body === 'object') {
+        body = JSON.stringify(req.body);
+      } else {
+        // ✅ Fallback per leggere il body manualmente
+        body = await new Promise((resolve) => {
+          let data = '';
+          req.on('data', chunk => { data += chunk; });
+          req.on('end', () => resolve(data));
         });
+      }
 
-        const result = await response.json();
+      console.log('📤 Sending POST to Google Script with body:', body);
 
-        if (result.success) {
-            console.log('✅ Prenotazione salvata:', result.data.bookingId);
+      const response = await fetch(baseUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body
+        headers: { 
+          'Content-Type': 'application/json',
+        },
+        body: body
+      });
 
-            // Aggiorna cache locale
-            const key = getBookingKey(bookingData.serviceId, bookingData.date, bookingData.time);
-            bookings[key] = (bookings[key] || 0) + 1;
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Google Script POST error:', response.status, errorText);
+        return res.status(response.status).json({ 
+          success: false,
+          error: 'Errore dal Google Script', 
+          details: errorText,
+          status: response.status
+        });
+      }
 
-            return { success: true, bookingId: result.data.bookingId };
-        } else {
-            throw new Error(result.message || 'Errore sconosciuto durante il salvataggio.');
-        }
-    } catch (error) {
-        console.error('❌ Errore salvataggio tramite proxy:', error);
-
-        // Fallback: ID temporaneo e aggiornamento cache locale
-        const bookingId = 'TEMP-' + Date.now();
-        const key = getBookingKey(bookingData.serviceId, bookingData.date, bookingData.time);
-        bookings[key] = (bookings[key] || 0) + 1;
-
-        return { success: true, bookingId };
+      const data = await response.json();
+      console.log('✅ Google Script POST response:', data);
+      return res.status(200).json(data);
     }
-}
 
-// ==========================
-// 📅 VERIFICA DISPONIBILITÀ ONLINE
-// ==========================
-async function checkAvailabilityOnline(serviceId, date, time) {
-    try {
-        const url = `${GOOGLE_APPS_SCRIPT_URL}?action=checkAvailability&serviceId=${serviceId}&date=${date}&time=${time}`;
-        const response = await fetch(url);
-        const result = await response.json();
+    const response = await fetch(scriptUrl);
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Errore dal Google Script' });
+    // ✅ Gestione GET con query parameters corretta
+    if (req.method === 'GET') {
+      // Estrai i query parameters dall'URL
+      const url = new URL(req.url, `https://${req.headers.host}`);
+      const queryString = url.search; // Include il '?' se presente
+      const scriptUrl = `${baseUrl}${queryString}`;
+      
+      console.log('📤 Sending GET to Google Script:', scriptUrl);
 
-        if (result.success) {
-            return result.data; // { booked: number }
-        } else {
-            throw new Error(result.message || 'Errore verifica disponibilità.');
-        }
-    } catch (error) {
-        console.error('❌ Errore verifica disponibilità tramite proxy:', error);
-        return null;
+      const response = await fetch(scriptUrl);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Google Script GET error:', response.status, errorText);
+        return res.status(response.status).json({ 
+          success: false,
+          error: 'Errore dal Google Script', 
+          details: errorText,
+          status: response.status
+        });
+      }
+
+      const data = await response.json();
+      console.log('✅ Google Script GET response:', data);
+      return res.status(200).json(data);
     }
-}
 
-// ==========================
-// 🔑 GENERATORE DI CHIAVI PER CACHE
-// ==========================
-function getBookingKey(serviceId, date, time) {
-    return `${serviceId}_${date}_${time}`;
-}
+    const data = await response.json();
+    res.status(200).json(data);
+    // ✅ Metodo non supportato
+    return res.status(405).json({ 
+      success: false,
+      error: 'Metodo non supportato', 
+      method: req.method 
+    });
 
-// ==========================
-// 🚀 AVVIO INIZIALE AL CARICAMENTO PAGINA
-// ==========================
-document.addEventListener('DOMContentLoaded', () => {
-    loadBookingsFromGoogle();
-});
+  } catch (error) {
+    res.status(500).json({ error: 'Server error', details: error.message });
+    console.error('❌ Server error:', error);
+    return res.status(500).json({ 
+      success: false,
+      error: 'Server error', 
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+}
